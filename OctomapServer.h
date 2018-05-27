@@ -27,8 +27,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef OCTOMAP_SERVER_OCTOMAPSERVER_H
-#define OCTOMAP_SERVER_OCTOMAPSERVER_H
+#ifndef OCTOMAPSERVER_H
+#define OCTOMAPSERVER_H
 
 #include <chrono>
 
@@ -95,7 +95,6 @@ public:
   virtual ~OctomapServer();
 
   virtual void insertCloudCallback(PCLPointCloud::Ptr pc, const Eigen::Matrix4f& sensorToWorld, const Eigen::Matrix4f& sensorToBase, const Eigen::Matrix4f& baseToWorld);
-  virtual bool openFile(const std::string& filename);
 
   OcTreeT* m_octree;
 protected:

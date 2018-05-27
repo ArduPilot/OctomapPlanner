@@ -29,14 +29,6 @@
 
 #include "OctomapServer.h"
 
-using namespace octomap;
-// using octomap_msgs::Octomap;
-
-bool is_equal (double a, double b, double epsilon = 1.0e-7)
-{
-    return std::abs(a - b) < epsilon;
-}
-
 OctomapServer::OctomapServer()
 : m_octree(NULL),
   m_maxRange(-1.0),
@@ -105,59 +97,6 @@ OctomapServer::~OctomapServer(){
 
 }
 
-bool OctomapServer::openFile(const std::string& filename){
-  if (filename.length() <= 3)
-    return false;
-
-  std::string suffix = filename.substr(filename.length()-3, 3);
-  if (suffix== ".bt"){
-    if (!m_octree->readBinary(filename)){
-      return false;
-    }
-  } else if (suffix == ".ot"){
-    AbstractOcTree* tree = AbstractOcTree::read(filename);
-    if (!tree){
-      return false;
-    }
-    if (m_octree){
-      delete m_octree;
-      m_octree = NULL;
-    }
-    m_octree = dynamic_cast<OcTreeT*>(tree);
-    if (!m_octree){
-      Error("Could not read OcTree in file, currently there are no other types supported in .ot");
-      return false;
-    }
-
-  } else{
-    return false;
-  }
-
-  Info("Octomap file " << filename.c_str() << "loaded (" <<  m_octree->size() << " nodes).");
-
-  m_treeDepth = m_octree->getTreeDepth();
-  m_maxTreeDepth = m_treeDepth;
-  m_res = m_octree->getResolution();
-  // m_gridmap.info.resolution = m_res;
-  double minX, minY, minZ;
-  double maxX, maxY, maxZ;
-  m_octree->getMetricMin(minX, minY, minZ);
-  m_octree->getMetricMax(maxX, maxY, maxZ);
-
-  m_updateBBXMin[0] = m_octree->coordToKey(minX);
-  m_updateBBXMin[1] = m_octree->coordToKey(minY);
-  // m_updateBBXMin[2] = m_octree->coordToKey(minZ);
-
-  m_updateBBXMax[0] = m_octree->coordToKey(maxX);
-  m_updateBBXMax[1] = m_octree->coordToKey(maxY);
-  m_updateBBXMax[2] = m_octree->coordToKey(maxZ);
-
-  // publishAll();
-
-  return true;
-
-}
-
 void OctomapServer::insertCloudCallback(PCLPointCloud::Ptr pc, const Eigen::Matrix4f& sensorToWorld, const Eigen::Matrix4f& sensorToBase, const Eigen::Matrix4f& baseToWorld){
 
   auto startTime = std::chrono::system_clock::now();
@@ -217,7 +156,7 @@ void OctomapServer::insertCloudCallback(PCLPointCloud::Ptr pc, const Eigen::Matr
 }
 
 void OctomapServer::insertScan(const Eigen::Vector3f& sensorOriginTf, const PCLPointCloud& ground, const PCLPointCloud& nonground){
-  point3d sensorOrigin (sensorOriginTf.x(),sensorOriginTf.y(),sensorOriginTf.z());
+  octomap::point3d sensorOrigin (sensorOriginTf.x(),sensorOriginTf.y(),sensorOriginTf.z());
 
   if (!m_octree->coordToKeyChecked(sensorOrigin, m_updateBBXMin)
     || !m_octree->coordToKeyChecked(sensorOrigin, m_updateBBXMax))
@@ -230,10 +169,10 @@ void OctomapServer::insertScan(const Eigen::Vector3f& sensorOriginTf, const PCLP
 #endif
 
   // instead of direct scan insertion, compute update to filter ground:
-  KeySet free_cells, occupied_cells;
+  octomap::KeySet free_cells, occupied_cells;
   // insert ground points only as free:
   for (PCLPointCloud::const_iterator it = ground.begin(); it != ground.end(); ++it){
-    point3d point(it->x, it->y, it->z);
+    octomap::point3d point(it->x, it->y, it->z);
     // maxrange check
     if ((m_maxRange > 0.0) && ((point - sensorOrigin).norm() > m_maxRange) ) {
       point = sensorOrigin + (point - sensorOrigin).normalized() * m_maxRange;
@@ -255,7 +194,7 @@ void OctomapServer::insertScan(const Eigen::Vector3f& sensorOriginTf, const PCLP
 
   // all other points: free on ray, occupied on endpoint:
   for (PCLPointCloud::const_iterator it = nonground.begin(); it != nonground.end(); ++it){
-    point3d point(it->x, it->y, it->z);
+    octomap::point3d point(it->x, it->y, it->z);
     // maxrange check
     if ((m_maxRange < 0.0) || ((point - sensorOrigin).norm() <= m_maxRange) ) {
 
@@ -264,7 +203,7 @@ void OctomapServer::insertScan(const Eigen::Vector3f& sensorOriginTf, const PCLP
         free_cells.insert(m_keyRay.begin(), m_keyRay.end());
       }
       // occupied endpoint
-      OcTreeKey key;
+      octomap::OcTreeKey key;
       if (m_octree->coordToKeyChecked(point, key)){
         occupied_cells.insert(key);
 
@@ -280,7 +219,7 @@ void OctomapServer::insertScan(const Eigen::Vector3f& sensorOriginTf, const PCLP
 #endif
       }
     } else {// ray longer than maxrange:;
-      point3d new_end = sensorOrigin + (point - sensorOrigin).normalized() * m_maxRange;
+      octomap::point3d new_end = sensorOrigin + (point - sensorOrigin).normalized() * m_maxRange;
       if (m_octree->computeRayKeys(sensorOrigin, new_end, m_keyRay)){
         free_cells.insert(m_keyRay.begin(), m_keyRay.end());
 
@@ -299,14 +238,14 @@ void OctomapServer::insertScan(const Eigen::Vector3f& sensorOriginTf, const PCLP
   }
 
   // mark free cells only if not seen occupied in this cloud
-  for(KeySet::iterator it = free_cells.begin(), end=free_cells.end(); it!= end; ++it){
+  for(octomap::KeySet::iterator it = free_cells.begin(), end=free_cells.end(); it!= end; ++it){
     if (occupied_cells.find(*it) == occupied_cells.end()){
       m_octree->updateNode(*it, false);
     }
   }
 
   // now mark all occupied cells:
-  for (KeySet::iterator it = occupied_cells.begin(), end=occupied_cells.end(); it!= end; it++) {
+  for (octomap::KeySet::iterator it = occupied_cells.begin(), end=occupied_cells.end(); it!= end; it++) {
     m_octree->updateNode(*it, true);
   }
 

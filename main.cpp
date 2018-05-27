@@ -38,13 +38,17 @@
 
 #include "stereo_matcher.h"
 #include "OctomapServer.h"
+#include "mavlink_comm.h"
 
-StereoMatcher object = StereoMatcher(std::string(SRC_DIR) + std::string("/camera_calibration.yaml"));
+StereoMatcher o_stereo = StereoMatcher(std::string(SRC_DIR) + std::string("/camera_calibration.yaml"));
 OctomapServer o_map = OctomapServer();
+MavlinkComm o_mavlink = MavlinkComm(14551, 14556);
 
 // Function is called everytime a message is received.
 void cb(ConstImagesStampedPtr &msg)
 {
+  o_mavlink.poll_data();
+
   int width;
   int height;
   char *data_l;
@@ -65,9 +69,9 @@ void cb(ConstImagesStampedPtr &msg)
   cv::imwrite("left.jpg",image_l);
   cv::imwrite("right.jpg",image_r);
   // std::cout << "reached1\n";
-  cv::imshow("disparity",object.matchPair(image_l,image_r));
-  // object.matchPair(image_l,image_r);
-  cv::Mat points = object.getPointcloud();
+  cv::imshow("disparity",o_stereo.matchPair(image_l,image_r));
+  // o_stereo.matchPair(image_l,image_r);
+  cv::Mat points = o_stereo.getPointcloud();
 
   pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_xyzrgb (new pcl::PointCloud<pcl::PointXYZRGB>); 
   pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_xyz (new pcl::PointCloud<pcl::PointXYZ>); 

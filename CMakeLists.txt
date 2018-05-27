@@ -24,8 +24,10 @@ add_library(OctomapServer SHARED OctomapServer.cpp)
 # target_compile_options(OctomapServer PRIVATE "-Wall")
 target_link_libraries(OctomapServer ${OCTOMAP_LIBRARIES} ${PCL_LIBRARIES})
 
-add_executable(main_node main.cpp)
-target_link_libraries(main_node ${GAZEBO_LIBRARIES} ${OpenCV_LIBS} ${PCL_COMMON_LIBRARIES} ${PCL_IO_LIBRARIES} ${PCL_VISUALIZATION_LIBRARIES} pthread StereoMatcher OctomapServer)
+add_library(MavlinkComm SHARED mavlink_comm.cpp)
+target_compile_options(MavlinkComm PRIVATE "-w")
 
-add_executable(mavlink_test mavlink_test.c)
-target_compile_options(mavlink_test PRIVATE "-w")
+add_executable(main_node main.cpp)
+target_link_libraries(main_node ${GAZEBO_LIBRARIES} ${OpenCV_LIBS} ${PCL_COMMON_LIBRARIES} ${PCL_IO_LIBRARIES} ${PCL_VISUALIZATION_LIBRARIES} pthread StereoMatcher OctomapServer MavlinkComm)
+
+# add_executable(mavlink_test mavlink_test.c)
