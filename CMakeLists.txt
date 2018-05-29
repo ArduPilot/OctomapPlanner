@@ -29,5 +29,5 @@ target_compile_options(MavlinkComm PRIVATE "-w")
 
 add_executable(main_node main.cpp)
 target_link_libraries(main_node ${GAZEBO_LIBRARIES} ${OpenCV_LIBS} ${PCL_COMMON_LIBRARIES} ${PCL_IO_LIBRARIES} ${PCL_VISUALIZATION_LIBRARIES} pthread StereoMatcher OctomapServer MavlinkComm)
-
+target_compile_options(main_node PRIVATE "-w")
 # add_executable(mavlink_test mavlink_test.c)

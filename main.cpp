@@ -29,12 +29,15 @@
 #include "pcl/common/common_headers.h"
 #include "pcl/io/io.h"
 #include "pcl/visualization//pcl_visualizer.h"
-#include <boost/thread/thread.hpp>
 #include <pcl/io/pcd_io.h>
 #include "pcl/point_cloud.h"
 #include <pcl/filters/voxel_grid.h>
 #include "pcl/visualization/cloud_viewer.h"
 #include <pcl/filters/statistical_outlier_removal.h>
+
+#include <boost/asio.hpp>
+#include <boost/thread/thread.hpp>
+#include <boost/date_time/posix_time/posix_time.hpp>
 
 #include "stereo_matcher.h"
 #include "OctomapServer.h"
@@ -42,13 +45,12 @@
 
 StereoMatcher o_stereo = StereoMatcher(std::string(SRC_DIR) + std::string("/camera_calibration.yaml"));
 OctomapServer o_map = OctomapServer();
-MavlinkComm o_mavlink = MavlinkComm(14551, 14556);
 
 // Function is called everytime a message is received.
 void cb(ConstImagesStampedPtr &msg)
 {
-  o_mavlink.poll_data();
 
+  // std::cout << "Callback\n";
   int width;
   int height;
   char *data_l;
@@ -76,25 +78,25 @@ void cb(ConstImagesStampedPtr &msg)
   pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_xyzrgb (new pcl::PointCloud<pcl::PointXYZRGB>); 
   pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_xyz (new pcl::PointCloud<pcl::PointXYZ>); 
 
-	for (int rows = 0; rows < points.rows; ++rows) { 
-	for (int cols = 0; cols < points.cols; ++cols) { 
-	   cv::Point3f point = points.at<cv::Point3f>(rows, cols); 
+  for (int rows = 0; rows < points.rows; ++rows) { 
+  for (int cols = 0; cols < points.cols; ++cols) { 
+     cv::Point3f point = points.at<cv::Point3f>(rows, cols); 
 
 
-	   pcl::PointXYZ pcl_point(point.x, point.y, point.z); // normal PointCloud 
+     pcl::PointXYZ pcl_point(point.x, point.y, point.z); // normal PointCloud 
 
-	   pcl::PointXYZRGB pcl_point_rgb;
-	   pcl_point_rgb.x = point.x;    // rgb PointCloud 
-	   pcl_point_rgb.y = point.y; 
-	   pcl_point_rgb.z = point.z; 
-	   cv::Vec3b intensity = image_l.at<cv::Vec3b>(rows,cols); //BGR 
-	   uint32_t rgb = (static_cast<uint32_t>(intensity[2]) << 16 | static_cast<uint32_t>(intensity[1]) << 8 | static_cast<uint32_t>(intensity[0])); 
-	   pcl_point_rgb.rgb = *reinterpret_cast<float*>(&rgb);
+     pcl::PointXYZRGB pcl_point_rgb;
+     pcl_point_rgb.x = point.x;    // rgb PointCloud 
+     pcl_point_rgb.y = point.y; 
+     pcl_point_rgb.z = point.z; 
+     cv::Vec3b intensity = image_l.at<cv::Vec3b>(rows,cols); //BGR 
+     uint32_t rgb = (static_cast<uint32_t>(intensity[2]) << 16 | static_cast<uint32_t>(intensity[1]) << 8 | static_cast<uint32_t>(intensity[0])); 
+     pcl_point_rgb.rgb = *reinterpret_cast<float*>(&rgb);
 
-	   cloud_xyz->push_back(pcl_point); 
-	   cloud_xyzrgb->push_back(pcl_point_rgb); 
-	  } 
-	}
+     cloud_xyz->push_back(pcl_point); 
+     cloud_xyzrgb->push_back(pcl_point_rgb); 
+    } 
+  }
 
   pcl::PassThrough<pcl::PointXYZ> pass_y;
   pass_y.setFilterFieldName("y");
@@ -108,7 +110,7 @@ void cb(ConstImagesStampedPtr &msg)
   sor.setStddevMulThresh (0.1);
   sor.filter (*cloud_xyz);
 
-	// Create the voxel filtering object
+  // Create the voxel filtering object
   pcl::VoxelGrid<pcl::PointXYZ> vf;
   vf.setInputCloud (cloud_xyz);
   vf.setLeafSize (0.01f, 0.01f, 0.01f);
@@ -156,9 +158,19 @@ int main(int _argc, char **_argv)
   node->Init();
   // Listen to Gazebo world_stats topic
   gazebo::transport::SubscriberPtr sub = node->Subscribe("~/iris/iris_demo/cam_link/stereo_camera/images", cb);
+  
+  // Attach a timer interrupt to mavlink poll function
+  boost::asio::io_service io_service;
+  MavlinkComm o_mavlink(14551, 14556, &io_service);
+  // boost::shared_ptr<boost::asio::io_service::work> work ( new boost::asio::io_service::work ( io_service ) );
+  boost::thread io_thread(boost::bind(&boost::asio::io_service::run, &io_service));
+  io_service.post(boost::bind(&MavlinkComm::run, &o_mavlink));
+  io_thread.join();
   // Busy wait loop...replace with your own code as needed.
   while (true)
-    gazebo::common::Time::MSleep(1);
+  {  
+    gazebo::common::Time::MSleep(10);
+  }
 
   // Make sure to shut everything down.
   gazebo::client::shutdown();

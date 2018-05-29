@@ -1,6 +1,10 @@
 #include "mavlink_comm.h"
 
-MavlinkComm::MavlinkComm(const size_t& bind_port, const size_t& remote_port)
+MavlinkComm::MavlinkComm(const size_t& bind_port, const size_t& remote_port, boost::asio::io_service *_io_service) :
+	io_service(_io_service),
+	interval(10),
+	timer(std::make_shared<boost::asio::deadline_timer>(*io_service, boost::posix_time::millisec(interval))),
+	io_work(new boost::asio::io_service::work(*io_service))
 {
 	
 	strcpy(target_ip, "127.0.0.1");
@@ -31,12 +35,20 @@ MavlinkComm::MavlinkComm(const size_t& bind_port, const size_t& remote_port)
 
 }
 
+MavlinkComm::~MavlinkComm()
+{
+	io_work.reset();
+	io_service->stop();
+}
+
 void MavlinkComm::poll_data()
 {
 	memset(buf, 0, BUFFER_LENGTH);
 	recsize = recvfrom(sock, (void *)buf, BUFFER_LENGTH, 0, (struct sockaddr *)&gcAddr, &fromlen);
 	if (recsize > 0)
-	{						
+	{	
+		// boost::mutex mtx_;
+		boost::lock_guard<boost::mutex> guard(mtx_);				
 		// Something received - print out all bytes and parse packet
 		mavlink_message_t msg;
 		mavlink_status_t status;
@@ -67,5 +79,13 @@ void MavlinkComm::poll_data()
 			}
 		}
 	}
+	// boost::this_thread::sleep( boost::posix_time::milliseconds(10));
 	memset(buf, 0, BUFFER_LENGTH);
+}
+
+void MavlinkComm::run()
+{
+	poll_data();
+	timer->expires_from_now(boost::posix_time::millisec(interval));
+	timer->async_wait(boost::bind(&MavlinkComm::run, this));
 }
