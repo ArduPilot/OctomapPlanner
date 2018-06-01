@@ -24,7 +24,9 @@
 #include <mavlink/v2.0/ardupilotmega/mavlink.h>
 #include <mavlink/v2.0/common/common.h>
 
-class MavlinkComm : boost::noncopyable
+#include "debug_definitions.h"
+
+class MavlinkComm
 {
 public:
 	MavlinkComm(const size_t& bind_port, const size_t& remote_port, boost::asio::io_service *io_service);

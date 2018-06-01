@@ -45,11 +45,10 @@ void MavlinkComm::poll_data()
 {
 	memset(buf, 0, BUFFER_LENGTH);
 	recsize = recvfrom(sock, (void *)buf, BUFFER_LENGTH, 0, (struct sockaddr *)&gcAddr, &fromlen);
+	// Something received - parse packet
 	if (recsize > 0)
 	{	
-		// boost::mutex mtx_;
 		boost::lock_guard<boost::mutex> guard(mtx_);				
-		// Something received - print out all bytes and parse packet
 		mavlink_message_t msg;
 		mavlink_status_t status;
 		
@@ -66,20 +65,19 @@ void MavlinkComm::poll_data()
 							{
 								// Packet received
 								mavlink_msg_local_position_ned_decode(&msg, &pos_msg);
-								printf("\nPose x: %f y: %f z: %f\n", pos_msg.x, pos_msg.y, pos_msg.z);
-								printf("\n");
+								Info("Pose x: " << pos_msg.x << " y: " << pos_msg.y << " z: " << pos_msg.z);
 								break;
 							}
 						default:
 							{
-								printf("MSG ID: %d\n", msg.msgid);
+								// Info("MSG ID: " << msg.msgid);
 								break;
 							}
 					}
 			}
 		}
 	}
-	// boost::this_thread::sleep( boost::posix_time::milliseconds(10));
+
 	memset(buf, 0, BUFFER_LENGTH);
 }
 

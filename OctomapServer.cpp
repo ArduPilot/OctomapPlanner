@@ -35,7 +35,7 @@ OctomapServer::OctomapServer()
   // m_worldFrameId("/map"), m_baseFrameId("base_footprint"),
   m_useHeightMap(true),
   m_useColoredMap(false),
-  m_res(0.01),
+  m_res(0.1),
   m_treeDepth(0),
   m_maxTreeDepth(0),
   m_pointcloudMinX(-std::numeric_limits<double>::max()),
