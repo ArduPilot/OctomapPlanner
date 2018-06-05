@@ -54,7 +54,7 @@ void insertCloud(pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud_xyz)
   Eigen::Matrix4f identity = Eigen::MatrixXf::Identity(4,4);
   Eigen::Matrix4f sensorToWorld = Eigen::MatrixXf::Identity(4,4);
   sensorToWorld.block<3,1>(1,1) = Eigen::Vector3f(o_mavlink->pos_msg.x,o_mavlink->pos_msg.y,o_mavlink->pos_msg.z);
-  o_map->insertCloudCallback(cloud_xyz, identity, identity, sensorToWorld);
+  o_map->insertCloudCallback(cloud_xyz, sensorToWorld, identity, identity);
   o_map->m_octree->writeBinary("map.bt");
 }
 
@@ -98,10 +98,10 @@ void processCloud(cv::Mat image_l)
   sor.filter (*cloud_xyz);
 
   // Create the voxel filtering object
-  // pcl::VoxelGrid<pcl::PointXYZ> vf;
-  // vf.setInputCloud (cloud_xyz);
-  // vf.setLeafSize (0.02f, 0.02f, 0.02f);
-  // vf.filter(*cloud_xyz);
+  pcl::VoxelGrid<pcl::PointXYZ> vf;
+  vf.setInputCloud (cloud_xyz);
+  vf.setLeafSize (0.01f, 0.01f, 0.01f);
+  vf.filter(*cloud_xyz);
 
   // pcl::PassThrough<pcl::PointXYZRGB> pass_y1;
   // pass_y1.setFilterFieldName("y");
@@ -121,7 +121,10 @@ void processCloud(cv::Mat image_l)
   // vf1.filter(*cloud_xyzrgb);
 
   pcl::io::savePCDFile ("test_pcd.pcd", *cloud_xyzrgb,false);
+  o_mavlink->gotoNED(o_mavlink->pos_msg.x, -count,o_mavlink->pos_msg.z);
+  Info("Sent command: " << o_mavlink->pos_msg.x << " " << -count << " " << o_mavlink->pos_msg.z);
   insertCloud(cloud_xyz);
+
 
 }
 
@@ -181,7 +184,7 @@ int main(int _argc, char **_argv)
   boost::asio::io_service io_service;
   
   // Initialize mavlink object
-  o_mavlink = std::make_shared<MavlinkComm>(14551, 14556, &io_service);
+  o_mavlink = std::make_shared<MavlinkComm>(14551, 14550, &io_service);
 
   // Run mavlink in a seperate thread for async polling
   boost::thread io_thread(boost::bind(&boost::asio::io_service::run, &io_service));

@@ -43,8 +43,8 @@ MavlinkComm::~MavlinkComm()
 
 void MavlinkComm::poll_data()
 {
-	memset(buf, 0, BUFFER_LENGTH);
-	recsize = recvfrom(sock, (void *)buf, BUFFER_LENGTH, 0, (struct sockaddr *)&gcAddr, &fromlen);
+	memset(rec_buf, 0, BUFFER_LENGTH);
+	recsize = recvfrom(sock, (void *)rec_buf, BUFFER_LENGTH, 0, (struct sockaddr *)&gcAddr, &fromlen);
 	// Something received - parse packet
 	if (recsize > 0)
 	{	
@@ -55,9 +55,9 @@ void MavlinkComm::poll_data()
 		// printf("Bytes Received: %d\nDatagram: ", (int)recsize);
 		for (ssize_t i = 0; i < recsize; ++i)
 		{
-			// temp = buf[i];
+			// temp = rec_buf[i];
 			// printf("%02x ", (unsigned char)temp);
-			if (mavlink_parse_char(MAVLINK_COMM_0, buf[i], &msg, &status))
+			if (mavlink_parse_char(MAVLINK_COMM_0, rec_buf[i], &msg, &status))
 			{
 				switch(msg.msgid)
 			      	{
@@ -78,7 +78,7 @@ void MavlinkComm::poll_data()
 		}
 	}
 
-	memset(buf, 0, BUFFER_LENGTH);
+	memset(rec_buf, 0, BUFFER_LENGTH);
 }
 
 void MavlinkComm::run()
@@ -86,4 +86,15 @@ void MavlinkComm::run()
 	poll_data();
 	timer->expires_from_now(boost::posix_time::millisec(interval));
 	timer->async_wait(boost::bind(&MavlinkComm::run, this));
+}
+
+void MavlinkComm::gotoNED(float x, float y, float z)
+{	
+	mavlink_message_t msg;
+	uint16_t len;
+	int bytes_sent;
+	mavlink_msg_set_position_target_local_ned_pack(1, 240, &msg, 0, 1, 1, MAV_FRAME_LOCAL_NED, 0b0000111111111000, x, y, z, 0, 0, 0, 0, 0, 0, 0, 0);
+	len = mavlink_msg_to_send_buffer(tx_buf, &msg);
+	bytes_sent = sendto(sock, tx_buf, len, 0, (struct sockaddr*)&gcAddr, sizeof(struct sockaddr_in));
+	memset(tx_buf, 0, BUFFER_LENGTH);
 }
