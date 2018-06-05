@@ -65,12 +65,17 @@ void MavlinkComm::poll_data()
 							{
 								// Packet received
 								mavlink_msg_local_position_ned_decode(&msg, &pos_msg);
-								Info("Pose x: " << pos_msg.x << " y: " << pos_msg.y << " z: " << pos_msg.z);
+								// Dbg("Pose x: " << pos_msg.x << " y: " << pos_msg.y << " z: " << pos_msg.z);
 								break;
+							}
+						case MAVLINK_MSG_ID_ATTITUDE:
+							{
+								mavlink_msg_attitude_decode(&msg, &orientation_msg);
+								// Dbg("Attitude roll: " <<  orientation_msg.roll << " pitch: " << orientation_msg.pitch << " yaw: " << orientation_msg.yaw);
 							}
 						default:
 							{
-								// Info("MSG ID: " << msg.msgid);
+								// Dbg("MSG ID: " << msg.msgid);
 								break;
 							}
 					}

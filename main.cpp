@@ -39,6 +39,8 @@
 #include <boost/thread/thread.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
 
+#include <csignal> // for SIGTERM
+
 #include "stereo_matcher.h"
 #include "OctomapServer.h"
 #include "mavlink_comm.h"
@@ -47,19 +49,28 @@
 std::shared_ptr<MavlinkComm> o_mavlink;
 std::shared_ptr<OctomapServer> o_map;
 std::shared_ptr<StereoMatcher> o_stereo;
+pcl::PointCloud<pcl::PointXYZRGB> final_cloud;
 int count = 0;
-
+boost::mutex mutex;
+bool is_cloud_processed = true;
 void insertCloud(pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud_xyz)
 {
   Eigen::Matrix4f identity = Eigen::MatrixXf::Identity(4,4);
   Eigen::Matrix4f sensorToWorld = Eigen::MatrixXf::Identity(4,4);
-  sensorToWorld.block<3,1>(1,1) = Eigen::Vector3f(o_mavlink->pos_msg.x,o_mavlink->pos_msg.y,o_mavlink->pos_msg.z);
+  sensorToWorld.block<3,1>(1,1) = Eigen::Vector3f(o_mavlink->pos_msg.z,o_mavlink->pos_msg.x,o_mavlink->pos_msg.y);
   o_map->insertCloudCallback(cloud_xyz, sensorToWorld, identity, identity);
-  o_map->m_octree->writeBinary("map.bt");
 }
 
+void fuseCloud(pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_xyzrgb)
+{
+  Eigen::Matrix4f sensorToWorld = Eigen::MatrixXf::Identity(4,4);
+  sensorToWorld.block<3,1>(1,1) = Eigen::Vector3f(o_mavlink->pos_msg.z,o_mavlink->pos_msg.x,o_mavlink->pos_msg.y);
+  pcl::transformPointCloud(*cloud_xyzrgb, *cloud_xyzrgb, sensorToWorld);
+  final_cloud += *cloud_xyzrgb;
+}
 void processCloud(cv::Mat image_l)
 {
+  Dbg("Cb");
   cv::Mat points = o_stereo->getPointcloud();
   float scale = 10; // Not sure why its needed but gives correct metric scale pointcloud
 
@@ -98,10 +109,10 @@ void processCloud(cv::Mat image_l)
   sor.filter (*cloud_xyz);
 
   // Create the voxel filtering object
-  pcl::VoxelGrid<pcl::PointXYZ> vf;
-  vf.setInputCloud (cloud_xyz);
-  vf.setLeafSize (0.01f, 0.01f, 0.01f);
-  vf.filter(*cloud_xyz);
+  // pcl::VoxelGrid<pcl::PointXYZ> vf;
+  // vf.setInputCloud (cloud_xyz);
+  // vf.setLeafSize (0.1f, 0.1f, 0.1f);
+  // vf.filter(*cloud_xyz);
 
   // pcl::PassThrough<pcl::PointXYZRGB> pass_y1;
   // pass_y1.setFilterFieldName("y");
@@ -120,48 +131,60 @@ void processCloud(cv::Mat image_l)
   // vf1.setLeafSize (0.01f, 0.01f, 0.01f);
   // vf1.filter(*cloud_xyzrgb);
 
-  pcl::io::savePCDFile ("test_pcd.pcd", *cloud_xyzrgb,false);
-  o_mavlink->gotoNED(o_mavlink->pos_msg.x, -count,o_mavlink->pos_msg.z);
-  Info("Sent command: " << o_mavlink->pos_msg.x << " " << -count << " " << o_mavlink->pos_msg.z);
+  // pcl::io::savePCDFile ("test_pcd.pcd", *cloud_xyzrgb,false);
+  Info("Last Pos: " << o_mavlink->pos_msg.x << " " << o_mavlink->pos_msg.y << " " << o_mavlink->pos_msg.z);
   insertCloud(cloud_xyz);
-
-
+  fuseCloud(cloud_xyzrgb);
+  boost::lock_guard<boost::mutex> guard(mutex);
+  is_cloud_processed = true;
 }
 
 // Function is called everytime an image message is received.
 void cb(ConstImagesStampedPtr &msg)
 {
-  int width;
-  int height;
-  char *data_l;
-  char *data_r;
-
-  width = (int) msg->image(0).width();
-  height = (int) msg->image(0).height();
-  data_l = new char[msg->image(0).data().length() + 1];
-  data_r = new char[msg->image(1).data().length() + 1];
-
-  memcpy(data_l, msg->image(0).data().c_str(), msg->image(0).data().length());
-  cv::Mat image_l(height, width, CV_8UC3, data_l);
-
-  memcpy(data_r, msg->image(1).data().c_str(), msg->image(1).data().length());
-  cv::Mat image_r(height, width, CV_8UC3, data_r);
-  cv::cvtColor(image_l, image_l, CV_BGR2RGB);
-  cv::cvtColor(image_r, image_r, CV_BGR2RGB);
-  // cv::imwrite("left.jpg",image_l);
-  // cv::imwrite("right.jpg",image_r);
-  cv::imshow("disparity",o_stereo->matchPair(image_l,image_r));
-
-  cv::waitKey(10);
-  processCloud(image_l);
-  delete data_l;
-  delete data_r;
-  count++;
-  if(count > 10)
+  mutex.lock();
+  if(is_cloud_processed == true)
   {
-    throw;
-  }
+    is_cloud_processed = false;
+    mutex.unlock();
+    int width;
+    int height;
+    char *data_l;
+    char *data_r;
 
+    width = (int) msg->image(0).width();
+    height = (int) msg->image(0).height();
+    data_l = new char[msg->image(0).data().length() + 1];
+    data_r = new char[msg->image(1).data().length() + 1];
+
+    memcpy(data_l, msg->image(0).data().c_str(), msg->image(0).data().length());
+    cv::Mat image_l(height, width, CV_8UC3, data_l);
+
+    memcpy(data_r, msg->image(1).data().c_str(), msg->image(1).data().length());
+    cv::Mat image_r(height, width, CV_8UC3, data_r);
+    cv::cvtColor(image_l, image_l, CV_BGR2RGB);
+    cv::cvtColor(image_r, image_r, CV_BGR2RGB);
+    // cv::imwrite("left.jpg",image_l);
+    // cv::imwrite("right.jpg",image_r);
+    cv::imshow("disparity",o_stereo->matchPair(image_l,image_r));
+
+    cv::waitKey(10);
+    boost::thread threadObj(processCloud, image_l);
+    threadObj.detach();
+    delete data_l;
+    delete data_r;
+    count++;
+    if(count > 5)
+    {
+      o_map->m_octree->writeBinary("map.bt");
+      pcl::io::savePCDFile ("test_pcd.pcd", final_cloud, false);
+      std::raise(SIGKILL);
+    }
+    else
+      o_mavlink->gotoNED(0, -count/2.0f, o_mavlink->pos_msg.z);
+  }
+  else
+    mutex.unlock();
 }
 
 int main(int _argc, char **_argv)

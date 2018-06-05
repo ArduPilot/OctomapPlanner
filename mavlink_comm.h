@@ -33,6 +33,7 @@ public:
 	~MavlinkComm();
 	void run();
 	mavlink_local_position_ned_t pos_msg;
+	mavlink_attitude_t orientation_msg;
 	uint8_t interval;
 	void gotoNED(float x, float y, float z);
 private:
