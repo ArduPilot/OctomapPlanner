@@ -93,12 +93,12 @@ void MavlinkComm::run()
 	timer->async_wait(boost::bind(&MavlinkComm::run, this));
 }
 
-void MavlinkComm::gotoNED(float x, float y, float z)
+void MavlinkComm::gotoNED(float x, float y, float z, float yaw)
 {	
 	mavlink_message_t msg;
 	uint16_t len;
 	int bytes_sent;
-	mavlink_msg_set_position_target_local_ned_pack(1, 240, &msg, 0, 1, 1, MAV_FRAME_LOCAL_NED, 0b0000111111111000, x, y, z, 0, 0, 0, 0, 0, 0, 0, 0);
+	mavlink_msg_set_position_target_local_ned_pack(1, 240, &msg, 0, 1, 1, MAV_FRAME_LOCAL_NED, 0b0000101111111000, x, y, z, 0, 0, 0, 0, 0, 0, yaw, 0);
 	len = mavlink_msg_to_send_buffer(tx_buf, &msg);
 	bytes_sent = sendto(sock, tx_buf, len, 0, (struct sockaddr*)&gcAddr, sizeof(struct sockaddr_in));
 	memset(tx_buf, 0, BUFFER_LENGTH);

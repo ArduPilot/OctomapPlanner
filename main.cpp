@@ -58,27 +58,24 @@ std::mutex octomap_mutex;
 bool is_cloud_processed = true, octomap_fused = true;
 std::condition_variable is_octomap_processed;
 
-void insertCloud(pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud_xyz)
+void insertCloud(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_xyz, Eigen::Matrix4f sensorToWorld)
 {
   octomap_fused = false;
   Eigen::Matrix4f identity = Eigen::MatrixXf::Identity(4,4);
-  Eigen::Matrix4f sensorToWorld = Eigen::MatrixXf::Identity(4,4);
-  sensorToWorld.block<3,1>(1,1) = Eigen::Vector3f(o_mavlink->pos_msg.z,o_mavlink->pos_msg.x,o_mavlink->pos_msg.y);
   o_map->insertCloudCallback(cloud_xyz, sensorToWorld, identity, identity);
+  // o_map->insertCloudCallback(pcl::PointCloud<pcl::PointXYZ>::Ptr(&cloud_xyz), sensorToWorld, identity, identity);
   
   std::lock_guard<std::mutex> guard(octomap_mutex);
   is_octomap_processed.notify_one();
   octomap_fused = true;
 }
 
-void fuseCloud(pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_xyzrgb)
+void fuseCloud(pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_xyzrgb, Eigen::Matrix4f sensorToWorld)
 {
-  Eigen::Matrix4f sensorToWorld = Eigen::MatrixXf::Identity(4,4);
-  sensorToWorld.block<3,1>(1,1) = Eigen::Vector3f(o_mavlink->pos_msg.z,o_mavlink->pos_msg.x,o_mavlink->pos_msg.y);
   pcl::transformPointCloud(*cloud_xyzrgb, *cloud_xyzrgb, sensorToWorld);
   final_cloud += *cloud_xyzrgb;
 }
-void processCloud(cv::Mat image_l)
+void processCloud(cv::Mat image_l, Eigen::Matrix4f sensorToWorld)
 {
   cv::Mat points = o_stereo->getPointcloud();
   float scale = 10; // Not sure why its needed but gives correct metric scale pointcloud
@@ -140,15 +137,14 @@ void processCloud(cv::Mat image_l)
   // vf1.setLeafSize (0.01f, 0.01f, 0.01f);
   // vf1.filter(*cloud_xyzrgb);
 
-  // pcl::io::savePCDFile ("test_pcd.pcd", *cloud_xyzrgb,false);
-  Info("Last Pos: " << o_mavlink->pos_msg.x << " " << o_mavlink->pos_msg.y << " " << o_mavlink->pos_msg.z);
+  Info("Last Pos: " << o_mavlink->pos_msg.x << " " << o_mavlink->pos_msg.y << " " << o_mavlink->pos_msg.z << " " << o_mavlink->orientation_msg.yaw);
   
   std::unique_lock<std::mutex> lk(octomap_mutex);
   is_octomap_processed.wait(lk, []{return octomap_fused;});
-  boost::thread octomapThread(insertCloud, cloud_xyz);
+  boost::thread octomapThread(insertCloud, cloud_xyz, sensorToWorld);
   octomapThread.detach();
   
-  fuseCloud(cloud_xyzrgb);
+  fuseCloud(cloud_xyzrgb, sensorToWorld);
 
   boost::lock_guard<boost::mutex> guard(pointcloud_mutex);
   is_cloud_processed = true;
@@ -160,8 +156,16 @@ void cb(ConstImagesStampedPtr &msg)
   pointcloud_mutex.lock();
   if(is_cloud_processed == true)
   {
-    is_cloud_processed = false;
     pointcloud_mutex.unlock();
+    Eigen::Matrix4f sensorToWorld = Eigen::MatrixXf::Identity(4,4);
+    Eigen::Matrix3f orientation;
+    // orientation = Eigen::AngleAxisf(o_mavlink->orientation_msg.pitch, Eigen::Vector3f::UnitX())
+      // * Eigen::AngleAxisf(o_mavlink->orientation_msg.yaw, Eigen::Vector3f::UnitY())
+      // * Eigen::AngleAxisf(o_mavlink->orientation_msg.roll, Eigen::Vector3f::UnitZ());
+    orientation = Eigen::AngleAxisf(o_mavlink->orientation_msg.yaw, Eigen::Vector3f::UnitY());
+    sensorToWorld.block<3,3>(0,0) = orientation;
+    sensorToWorld.block<3,1>(0,3) = Eigen::Vector3f(o_mavlink->pos_msg.y,o_mavlink->pos_msg.z,o_mavlink->pos_msg.x);
+
     int width;
     int height;
     char *data_l;
@@ -181,22 +185,39 @@ void cb(ConstImagesStampedPtr &msg)
     cv::cvtColor(image_r, image_r, CV_BGR2RGB);
     // cv::imwrite("left.jpg",image_l);
     // cv::imwrite("right.jpg",image_r);
+    // cv::imwrite("disparity.jpg",o_stereo->matchPair(image_l,image_r));
     cv::imshow("disparity",o_stereo->matchPair(image_l,image_r));
 
     cv::waitKey(10);
-    boost::thread pointcloudThread(processCloud, image_l);
-    pointcloudThread.detach();
     delete data_l;
     delete data_r;
     count++;
     if(count > 5)
     {
+      gazebo::common::Time::Sleep(2);
+      std::unique_lock<std::mutex> lk(octomap_mutex);
+      is_octomap_processed.wait(lk, []{return octomap_fused;});
       o_map->m_octree->writeBinary("map.bt");
       pcl::io::savePCDFile ("test_pcd.pcd", final_cloud, false);
+      o_mavlink->gotoNED(0, 0, o_mavlink->pos_msg.z, 0);
       std::raise(SIGKILL);
     }
     else
-      o_mavlink->gotoNED(0, -count/2.0f, o_mavlink->pos_msg.z);
+    {
+      Dbg(sensorToWorld);
+      if(abs(sensorToWorld(1,3)) < 1e-2)
+      {
+        Dbg("Z " << abs(sensorToWorld(1,3)));
+        count--;
+      }
+      else
+      {
+        is_cloud_processed = false;
+        boost::thread pointcloudThread(processCloud, image_l, sensorToWorld);
+        pointcloudThread.detach();
+        o_mavlink->gotoNED(0, -count, -1.5, 0);
+      }
+    }
   }
   else
     pointcloud_mutex.unlock();

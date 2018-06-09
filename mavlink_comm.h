@@ -23,6 +23,7 @@
 
 #include <mavlink/v2.0/ardupilotmega/mavlink.h>
 #include <mavlink/v2.0/common/common.h>
+// #include <mavlink/v2.0/mavlink_conversions.h>
 
 #include "debug_definitions.h"
 
@@ -35,7 +36,7 @@ public:
 	mavlink_local_position_ned_t pos_msg;
 	mavlink_attitude_t orientation_msg;
 	uint8_t interval;
-	void gotoNED(float x, float y, float z);
+	void gotoNED(float x, float y, float z, float yaw);
 private:
 	char target_ip[50];
 	int sock = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP);
