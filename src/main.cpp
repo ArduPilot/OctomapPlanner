@@ -1,19 +1,17 @@
 /*
- * Copyright (C) 2012 Open Source Robotics Foundation
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- *
-*/
+   This program is free software: you can redistribute it and/or modify
+   it under the terms of the GNU General Public License as published by
+   the Free Software Foundation, either version 3 of the License, or
+   (at your option) any later version.
+
+   This program is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty of
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+   GNU General Public License for more details.
+
+   You should have received a copy of the GNU General Public License
+   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
 
 #include <gazebo/transport/transport.hh>
 #include <gazebo/msgs/msgs.hh>
@@ -61,9 +59,11 @@ std::condition_variable is_octomap_processed;
 void insertCloud(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_xyz, Eigen::Matrix4f sensorToWorld)
 {
   octomap_fused = false;
-  Eigen::Matrix4f identity = Eigen::MatrixXf::Identity(4,4);
-  o_map->insertCloudCallback(cloud_xyz, sensorToWorld, identity, identity);
-  // o_map->insertCloudCallback(pcl::PointCloud<pcl::PointXYZ>::Ptr(&cloud_xyz), sensorToWorld, identity, identity);
+  Eigen::Matrix4f transform_cam_world;
+  transform_cam_world << 0,0,1,0,-1,0,0,0,0,-1,0,0,0,0,0,1; //Rotate camera optical to ENU;
+  pcl::transformPointCloud(*cloud_xyz, *cloud_xyz, transform_cam_world);
+  Dbg(sensorToWorld);
+  o_map->insertCloudCallback(cloud_xyz, sensorToWorld);
   
   std::lock_guard<std::mutex> guard(octomap_mutex);
   is_octomap_processed.notify_one();
@@ -77,7 +77,13 @@ void fuseCloud(pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_xyzrgb, Eigen::Matr
 }
 void processCloud(cv::Mat image_l, Eigen::Matrix4f sensorToWorld)
 {
+  auto startTime = std::chrono::system_clock::now();
   cv::Mat points = o_stereo->getPointcloud();
+  
+  std::chrono::duration<double> total_elapsed = std::chrono::system_clock::now() - startTime;
+  startTime = std::chrono::system_clock::now();
+  Dbg("Disp to pointcloud: " << total_elapsed.count());
+  
   float scale = 10; // Not sure why its needed but gives correct metric scale pointcloud
 
   pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_xyzrgb (new pcl::PointCloud<pcl::PointXYZRGB>); 
@@ -85,57 +91,44 @@ void processCloud(cv::Mat image_l, Eigen::Matrix4f sensorToWorld)
 
   for (int rows = 0; rows < points.rows; ++rows) { 
   for (int cols = 0; cols < points.cols; ++cols) { 
-     cv::Point3f point = points.at<cv::Point3f>(rows, cols); 
+     cv::Point3f point = points.at<cv::Point3f>(rows, cols);
+     if(scale * point.z <= 8.0 && scale * point.z >= 0.5 && scale * point.y >= 0.1 && scale * point.y <= 5 && scale * point.x <= 5.0 && scale * point.x >= -5.0)
+     {
+       pcl::PointXYZ pcl_point(scale * point.x, scale * point.y, scale * point.z); // normal PointCloud 
 
-     pcl::PointXYZ pcl_point(scale * point.x, scale * point.y, scale * point.z); // normal PointCloud 
+       pcl::PointXYZRGB pcl_point_rgb;
+       pcl_point_rgb.x = scale * point.x;    // rgb PointCloud 
+       pcl_point_rgb.y = scale * point.y; 
+       pcl_point_rgb.z = scale * point.z; 
+       cv::Vec3b intensity = image_l.at<cv::Vec3b>(rows,cols); //BGR 
+       uint32_t rgb = (static_cast<uint32_t>(intensity[2]) << 16 | static_cast<uint32_t>(intensity[1]) << 8 | static_cast<uint32_t>(intensity[0])); 
+       pcl_point_rgb.rgb = *reinterpret_cast<float*>(&rgb);
 
-     pcl::PointXYZRGB pcl_point_rgb;
-     pcl_point_rgb.x = scale * point.x;    // rgb PointCloud 
-     pcl_point_rgb.y = scale * point.y; 
-     pcl_point_rgb.z = scale * point.z; 
-     cv::Vec3b intensity = image_l.at<cv::Vec3b>(rows,cols); //BGR 
-     uint32_t rgb = (static_cast<uint32_t>(intensity[2]) << 16 | static_cast<uint32_t>(intensity[1]) << 8 | static_cast<uint32_t>(intensity[0])); 
-     pcl_point_rgb.rgb = *reinterpret_cast<float*>(&rgb);
-
-     cloud_xyz->push_back(pcl_point); 
-     cloud_xyzrgb->push_back(pcl_point_rgb); 
+       cloud_xyz->push_back(pcl_point); 
+       cloud_xyzrgb->push_back(pcl_point_rgb);
+     }
     } 
   }
+  
+  total_elapsed = std::chrono::system_clock::now() - startTime;
+  startTime = std::chrono::system_clock::now();
+  Dbg("Pointcloud insertion time: " << total_elapsed.count());
 
-  // pcl::PassThrough<pcl::PointXYZ> pass_y;
-  // pass_y.setFilterFieldName("y");
-  // pass_y.setFilterLimits(-4, 0.1);
-  // pass_y.setInputCloud(cloud_xyz);
-  // pass_y.filter(*cloud_xyz);
+  // pcl::StatisticalOutlierRemoval<pcl::PointXYZ> sor;
+  // sor.setInputCloud (cloud_xyz);
+  // sor.setMeanK (50);
+  // sor.setStddevMulThresh (0.1);
+  // sor.filter (*cloud_xyz);
 
-  pcl::StatisticalOutlierRemoval<pcl::PointXYZ> sor;
-  sor.setInputCloud (cloud_xyz);
-  sor.setMeanK (50);
-  sor.setStddevMulThresh (0.1);
-  sor.filter (*cloud_xyz);
+  // pcl::StatisticalOutlierRemoval<pcl::PointXYZRGB> sor1;
+  // sor1.setInputCloud (cloud_xyzrgb);
+  // sor1.setMeanK (50);
+  // sor1.setStddevMulThresh (0.1);
+  // sor1.filter (*cloud_xyzrgb);
 
-  // Create the voxel filtering object
-  // pcl::VoxelGrid<pcl::PointXYZ> vf;
-  // vf.setInputCloud (cloud_xyz);
-  // vf.setLeafSize (0.005f, 0.005f, 0.005f);
-  // vf.filter(*cloud_xyz);
-
-  // pcl::PassThrough<pcl::PointXYZRGB> pass_y1;
-  // pass_y1.setFilterFieldName("y");
-  // pass_y1.setFilterLimits(-4, 0.01);
-  // pass_y1.setInputCloud(cloud_xyzrgb);
-  // pass_y1.filter(*cloud_xyzrgb);
-
-  pcl::StatisticalOutlierRemoval<pcl::PointXYZRGB> sor1;
-  sor1.setInputCloud (cloud_xyzrgb);
-  sor1.setMeanK (50);
-  sor1.setStddevMulThresh (0.1);
-  sor1.filter (*cloud_xyzrgb);
-
-  // pcl::VoxelGrid<pcl::PointXYZRGB> vf1;
-  // vf1.setInputCloud (cloud_xyzrgb);
-  // vf1.setLeafSize (0.01f, 0.01f, 0.01f);
-  // vf1.filter(*cloud_xyzrgb);
+  // total_elapsed = std::chrono::system_clock::now() - startTime;
+  // startTime = std::chrono::system_clock::now();
+  // Dbg"Filter time: " << total_elapsed.count());
 
   Info("Last Pos: " << o_mavlink->pos_msg.x << " " << o_mavlink->pos_msg.y << " " << o_mavlink->pos_msg.z << " " << o_mavlink->orientation_msg.yaw);
   
@@ -144,7 +137,12 @@ void processCloud(cv::Mat image_l, Eigen::Matrix4f sensorToWorld)
   boost::thread octomapThread(insertCloud, cloud_xyz, sensorToWorld);
   octomapThread.detach();
   
-  fuseCloud(cloud_xyzrgb, sensorToWorld);
+  // Integrate the pointcloud (needed only for visualization)
+  // fuseCloud(cloud_xyzrgb, sensorToWorld);
+  
+  total_elapsed = std::chrono::system_clock::now() - startTime;
+  startTime = std::chrono::system_clock::now();
+  Dbg("Fusion time: " << total_elapsed.count());
 
   boost::lock_guard<boost::mutex> guard(pointcloud_mutex);
   is_cloud_processed = true;
@@ -159,12 +157,17 @@ void cb(ConstImagesStampedPtr &msg)
     pointcloud_mutex.unlock();
     Eigen::Matrix4f sensorToWorld = Eigen::MatrixXf::Identity(4,4);
     Eigen::Matrix3f orientation;
-    // orientation = Eigen::AngleAxisf(o_mavlink->orientation_msg.pitch, Eigen::Vector3f::UnitX())
-      // * Eigen::AngleAxisf(o_mavlink->orientation_msg.yaw, Eigen::Vector3f::UnitY())
-      // * Eigen::AngleAxisf(o_mavlink->orientation_msg.roll, Eigen::Vector3f::UnitZ());
-    orientation = Eigen::AngleAxisf(o_mavlink->orientation_msg.yaw, Eigen::Vector3f::UnitY());
+    // orientation = Eigen::AngleAxisf(o_mavlink->orientation_msg.yaw, Eigen::Vector3f::UnitY())
+    //             * Eigen::AngleAxisf(o_mavlink->orientation_msg.roll, Eigen::Vector3f::UnitZ())
+    //             * Eigen::AngleAxisf(o_mavlink->orientation_msg.pitch, Eigen::Vector3f::UnitX());
+    // sensorToWorld.block<3,3>(0,0) = orientation;
+    // sensorToWorld.block<3,1>(0,3) = Eigen::Vector3f(o_mavlink->pos_msg.y,o_mavlink->pos_msg.z,o_mavlink->pos_msg.x);
+
+    orientation = Eigen::AngleAxisf(-o_mavlink->orientation_msg.yaw, Eigen::Vector3f::UnitY())
+                * Eigen::AngleAxisf(-o_mavlink->orientation_msg.roll, Eigen::Vector3f::UnitZ())
+                * Eigen::AngleAxisf(o_mavlink->orientation_msg.pitch, Eigen::Vector3f::UnitX());
     sensorToWorld.block<3,3>(0,0) = orientation;
-    sensorToWorld.block<3,1>(0,3) = Eigen::Vector3f(o_mavlink->pos_msg.y,o_mavlink->pos_msg.z,o_mavlink->pos_msg.x);
+    sensorToWorld.block<3,1>(0,3) = Eigen::Vector3f(o_mavlink->pos_msg.x, -o_mavlink->pos_msg.y, -o_mavlink->pos_msg.z);
 
     int width;
     int height;
@@ -183,31 +186,29 @@ void cb(ConstImagesStampedPtr &msg)
     cv::Mat image_r(height, width, CV_8UC3, data_r);
     cv::cvtColor(image_l, image_l, CV_BGR2RGB);
     cv::cvtColor(image_r, image_r, CV_BGR2RGB);
-    // cv::imwrite("left.jpg",image_l);
-    // cv::imwrite("right.jpg",image_r);
-    // cv::imwrite("disparity.jpg",o_stereo->matchPair(image_l,image_r));
+
     cv::imshow("disparity",o_stereo->matchPair(image_l,image_r));
 
     cv::waitKey(10);
     delete data_l;
     delete data_r;
     count++;
-    if(count > 5)
+    if(count > 100)
     {
-      gazebo::common::Time::Sleep(2);
+      // gazebo::common::Time::Sleep(2);
       std::unique_lock<std::mutex> lk(octomap_mutex);
       is_octomap_processed.wait(lk, []{return octomap_fused;});
       o_map->m_octree->writeBinary("map.bt");
-      pcl::io::savePCDFile ("test_pcd.pcd", final_cloud, false);
+      // pcl::io::savePCDFile ("test_pcd.pcd", final_cloud, false);
       o_mavlink->gotoNED(0, 0, o_mavlink->pos_msg.z, 0);
       std::raise(SIGKILL);
     }
     else
     {
-      Dbg(sensorToWorld);
-      if(abs(sensorToWorld(1,3)) < 1e-2)
+      // Dbg(sensorToWorld);
+      if(abs(sensorToWorld(2,3)) < 1e-2)
       {
-        Dbg("Z " << abs(sensorToWorld(1,3)));
+        Dbg("Z " << abs(sensorToWorld(2,3)));
         count--;
       }
       else
@@ -215,7 +216,7 @@ void cb(ConstImagesStampedPtr &msg)
         is_cloud_processed = false;
         boost::thread pointcloudThread(processCloud, image_l, sensorToWorld);
         pointcloudThread.detach();
-        o_mavlink->gotoNED(0, -count, -1.5, 0);
+        o_mavlink->gotoNED(0, -count/5, -1.5, 0);
       }
     }
   }
@@ -238,7 +239,7 @@ int main(int _argc, char **_argv)
   o_map = std::make_shared<OctomapServer>();
 
   // Initialize stereo matcher object
-  o_stereo = std::make_shared<StereoMatcher>(std::string(SRC_DIR) + std::string("/camera_calibration.yaml"));
+  o_stereo = std::make_shared<StereoMatcher>(std::string(SRC_DIR) + std::string("/config/camera_calibration.yaml"));
 
   boost::asio::io_service io_service;
   

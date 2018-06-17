@@ -1,3 +1,18 @@
+/*
+   This program is free software: you can redistribute it and/or modify
+   it under the terms of the GNU General Public License as published by
+   the Free Software Foundation, either version 3 of the License, or
+   (at your option) any later version.
+
+   This program is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty of
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+   GNU General Public License for more details.
+
+   You should have received a copy of the GNU General Public License
+   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
 #include "stereo_matcher.h"
 #include <iostream>
 
@@ -35,12 +50,12 @@ StereoMatcher::StereoMatcher(const std::string &parameters_filename)
 		    sgbm->setP2(32*cn*sgbmWinSize*sgbmWinSize);
 		    sgbm->setMinDisparity(0);
 		    sgbm->setNumDisparities(numberOfDisparities);
-		    sgbm->setUniquenessRatio(10);
-		    sgbm->setSpeckleWindowSize(100);
+		    sgbm->setUniquenessRatio(5);
+		    sgbm->setSpeckleWindowSize(200);
 		    sgbm->setSpeckleRange(32);
 		    sgbm->setDisp12MaxDiff(1);
-	        // sgbm->setMode(cv::StereoSGBM::MODE_HH);
-	        sgbm->setMode(cv::StereoSGBM::MODE_SGBM);
+	        sgbm->setMode(cv::StereoSGBM::MODE_HH);
+	        // sgbm->setMode(cv::StereoSGBM::MODE_SGBM);
 	        // sgbm->setMode(cv::StereoSGBM::MODE_SGBM_3WAY);
     	}
     	catch(cv::Exception& e )
