@@ -74,8 +74,11 @@ cv::Mat StereoMatcher::matchPair(cv::Mat img1, cv::Mat img2)
 	initUndistortRectifyMap(M1, D1, R1, P1, img_size, CV_16SC2, map11, map12);
 	initUndistortRectifyMap(M2, D2, R2, P2, img_size, CV_16SC2, map21, map22);
 
-	cv::cvtColor(img1, img1, CV_BGR2GRAY);
-	cv::cvtColor(img2, img2, CV_BGR2GRAY);
+	if(img1.type() != 0)
+	{
+		cv::cvtColor(img1, img1, CV_BGR2GRAY);
+		cv::cvtColor(img2, img2, CV_BGR2GRAY);
+	}
 	remap(img1, img1r, map11, map12, cv::INTER_LINEAR);
 	remap(img2, img2r, map21, map22, cv::INTER_LINEAR);
 

@@ -13,11 +13,6 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <gazebo/transport/transport.hh>
-#include <gazebo/msgs/msgs.hh>
-
-#include <gazebo/gazebo_client.hh>
-
 #include <iostream>
 
 #include <opencv2/opencv.hpp>
@@ -45,6 +40,9 @@
 #include "mavlink_comm.h"
 
 #include <condition_variable>
+
+#include "loitor/optorusb.h"
+#include "loitor/optorcam.h"
 
 std::shared_ptr<MavlinkComm> o_mavlink;
 std::shared_ptr<OctomapServer> o_map;
@@ -130,7 +128,7 @@ void processCloud(cv::Mat image_l, Eigen::Matrix4f sensorToWorld)
   // startTime = std::chrono::system_clock::now();
   // Dbg"Filter time: " << total_elapsed.count());
 
-  Info("Last Pos: " << o_mavlink->pos_msg.x << " " << o_mavlink->pos_msg.y << " " << o_mavlink->pos_msg.z << " " << o_mavlink->orientation_msg.yaw);
+  // Info("Last Pos: " << o_mavlink->pos_msg.x << " " << o_mavlink->pos_msg.y << " " << o_mavlink->pos_msg.z << " " << o_mavlink->orientation_msg.yaw);
   
   std::unique_lock<std::mutex> lk(octomap_mutex);
   is_octomap_processed.wait(lk, []{return octomap_fused;});
@@ -149,7 +147,7 @@ void processCloud(cv::Mat image_l, Eigen::Matrix4f sensorToWorld)
 }
 
 // Function is called everytime an image message is received.
-void cb(ConstImagesStampedPtr &msg)
+void cb()
 {
   pointcloud_mutex.lock();
   if(is_cloud_processed == true)
@@ -163,60 +161,67 @@ void cb(ConstImagesStampedPtr &msg)
     // sensorToWorld.block<3,3>(0,0) = orientation;
     // sensorToWorld.block<3,1>(0,3) = Eigen::Vector3f(o_mavlink->pos_msg.y,o_mavlink->pos_msg.z,o_mavlink->pos_msg.x);
 
-    orientation = Eigen::AngleAxisf(-o_mavlink->orientation_msg.yaw, Eigen::Vector3f::UnitY())
-                * Eigen::AngleAxisf(-o_mavlink->orientation_msg.roll, Eigen::Vector3f::UnitZ())
-                * Eigen::AngleAxisf(o_mavlink->orientation_msg.pitch, Eigen::Vector3f::UnitX());
-    sensorToWorld.block<3,3>(0,0) = orientation;
-    sensorToWorld.block<3,1>(0,3) = Eigen::Vector3f(o_mavlink->pos_msg.x, -o_mavlink->pos_msg.y, -o_mavlink->pos_msg.z);
+    // orientation = Eigen::AngleAxisf(-o_mavlink->orientation_msg.yaw, Eigen::Vector3f::UnitY())
+    //             * Eigen::AngleAxisf(-o_mavlink->orientation_msg.roll, Eigen::Vector3f::UnitZ())
+    //             * Eigen::AngleAxisf(o_mavlink->orientation_msg.pitch, Eigen::Vector3f::UnitX());
+    // sensorToWorld.block<3,3>(0,0) = orientation;
+    // sensorToWorld.block<3,1>(0,3) = Eigen::Vector3f(o_mavlink->pos_msg.x, -o_mavlink->pos_msg.y, -o_mavlink->pos_msg.z);
 
-    int width;
-    int height;
-    char *data_l;
-    char *data_r;
+    cv::Mat image_l(cv::Size(visensor_img_width(),visensor_img_height()),CV_8UC1);
+    double left_timestamp;
+    cv::Mat image_r(cv::Size(visensor_img_width(),visensor_img_height()),CV_8UC1);
+    double right_timestamp;
+    if(visensor_is_rightcam_open())
+    {
+        if(visensor_is_right_img_new())
+        {
+            visensor_get_right_latest_img(image_l.data,&left_timestamp);
+            printf("L-Time: %8.6f\n",left_timestamp);
+            imshow("left",image_l);
+        }
+    }
+    if(visensor_is_leftcam_open())
+    {
+        if(visensor_is_left_img_new())
+        {
+            visensor_get_left_latest_img(image_r.data,&right_timestamp);
+            printf("R-Time: %8.6f\n",right_timestamp);
+            imshow("right",image_r);
+        }
+    }
 
-    width = (int) msg->image(0).width();
-    height = (int) msg->image(0).height();
-    data_l = new char[msg->image(0).data().length() + 1];
-    data_r = new char[msg->image(1).data().length() + 1];
-
-    memcpy(data_l, msg->image(0).data().c_str(), msg->image(0).data().length());
-    cv::Mat image_l(height, width, CV_8UC3, data_l);
-
-    memcpy(data_r, msg->image(1).data().c_str(), msg->image(1).data().length());
-    cv::Mat image_r(height, width, CV_8UC3, data_r);
-    cv::cvtColor(image_l, image_l, CV_BGR2RGB);
-    cv::cvtColor(image_r, image_r, CV_BGR2RGB);
-
-    cv::imshow("disparity",o_stereo->matchPair(image_l,image_r));
+    auto startTime = std::chrono::system_clock::now();
+    cv::Mat disparity = o_stereo->matchPair(image_l,image_r);
+    std::chrono::duration<double> total_elapsed = std::chrono::system_clock::now() - startTime;
+    Dbg("Disparity computation time: " << total_elapsed.count());
+    cv::imshow("disparity", disparity);
 
     cv::waitKey(10);
-    delete data_l;
-    delete data_r;
+
     count++;
-    if(count > 50)
+    if(count > 10)
     {
-      // gazebo::common::Time::Sleep(2);
       std::unique_lock<std::mutex> lk(octomap_mutex);
       is_octomap_processed.wait(lk, []{return octomap_fused;});
       o_map->m_octree->writeBinary("map.bt");
       // pcl::io::savePCDFile ("test_pcd.pcd", final_cloud, false);
-      o_mavlink->gotoNED(0, 0, o_mavlink->pos_msg.z, 0);
+      // o_mavlink->gotoNED(0, 0, o_mavlink->pos_msg.z, 0);
       std::raise(SIGKILL);
     }
     else
     {
       // Dbg(sensorToWorld);
-      if(abs(sensorToWorld(2,3)) < 1e-2)
-      {
-        Dbg("Z " << abs(sensorToWorld(2,3)));
-        count--;
-      }
-      else
+      // if(abs(sensorToWorld(2,3)) < 1e-2)
+      // {
+      //   Dbg("Z " << abs(sensorToWorld(2,3)));
+      //   count--;
+      // }
+      // else
       {
         is_cloud_processed = false;
         boost::thread pointcloudThread(processCloud, image_l, sensorToWorld);
         pointcloudThread.detach();
-        o_mavlink->gotoNED(0, -count/5, -1.5, 0);
+        // o_mavlink->gotoNED(0, -count/5, -1.5, 0);
       }
     }
   }
@@ -226,37 +231,42 @@ void cb(ConstImagesStampedPtr &msg)
 
 int main(int _argc, char **_argv)
 {
-  // Load gazebo
-  gazebo::client::setup(_argc, _argv);
 
-  // Create our node for communication
-  gazebo::transport::NodePtr node(new gazebo::transport::Node());
-  node->Init();
-  // Listen to Gazebo topic
-  gazebo::transport::SubscriberPtr sub = node->Subscribe("~/iris/iris_demo/cam_link/stereo_camera/images", cb);
+  visensor_load_settings((std::string(SRC_DIR) + std::string("/config/optor_VISensor_Setups.txt")).c_str());
   
+  int r = visensor_Start_Cameras();
+  if(r<0)
+  {
+      printf("Opening cameras failed...\r\n");
+  }
+
+  usleep(2000000);
+
   // Initialize octomap object
   o_map = std::make_shared<OctomapServer>();
 
   // Initialize stereo matcher object
-  o_stereo = std::make_shared<StereoMatcher>(std::string(SRC_DIR) + std::string("/config/camera_calibration.yaml"));
+  o_stereo = std::make_shared<StereoMatcher>(std::string(SRC_DIR) + std::string("/config/loiter_camera_calibration.yaml"));
 
-  boost::asio::io_service io_service;
+  // boost::asio::io_service io_service;
   
   // Initialize mavlink object
-  o_mavlink = std::make_shared<MavlinkComm>(14551, 14550, &io_service);
+  // o_mavlink = std::make_shared<MavlinkComm>(14551, 14550, &io_service);
 
   // Run mavlink in a seperate thread for async polling
-  boost::thread io_thread(boost::bind(&boost::asio::io_service::run, &io_service));
-  io_service.post(boost::bind(&MavlinkComm::run, o_mavlink));
-  io_thread.join();
+  // boost::thread io_thread(boost::bind(&boost::asio::io_service::run, &io_service));
+  // io_service.post(boost::bind(&MavlinkComm::run, o_mavlink));
+  // io_thread.join();
 
   // Busy wait loop
   while (true)
   {  
-    gazebo::common::Time::MSleep(100);
+    cb();
+    usleep(100000); //10Hz
+
   }
 
   // Make sure to shut everything down.
-  gazebo::client::shutdown();
+  /* close cameras */
+  visensor_Close_Cameras();
 }
