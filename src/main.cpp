@@ -92,7 +92,7 @@ void processCloud(cv::Mat image_l, Eigen::Matrix4f sensorToWorld)
   for (int rows = 0; rows < points.rows; ++rows) { 
   for (int cols = 0; cols < points.cols; ++cols) { 
      cv::Point3f point = points.at<cv::Point3f>(rows, cols);
-     if(scale * point.z <= 8.0 && scale * point.z >= 0.5 && scale * point.y >= 0.1 && scale * point.y <= 5 && scale * point.x <= 5.0 && scale * point.x >= -5.0)
+     if(scale * point.z <= 7.0 && scale * point.z >= 0.5 && scale * point.y >= -2.5 && scale * point.y <= 2.5 && scale * point.x <= 5.0 && scale * point.x >= -5.0)
      {
        pcl::PointXYZ pcl_point(scale * point.x, scale * point.y, scale * point.z); // normal PointCloud 
 
@@ -138,7 +138,7 @@ void processCloud(cv::Mat image_l, Eigen::Matrix4f sensorToWorld)
   octomapThread.detach();
   
   // Integrate the pointcloud (needed only for visualization)
-  // fuseCloud(cloud_xyzrgb, sensorToWorld);
+  fuseCloud(cloud_xyzrgb, sensorToWorld);
   
   total_elapsed = std::chrono::system_clock::now() - startTime;
   startTime = std::chrono::system_clock::now();
@@ -193,7 +193,7 @@ void cb(ConstImagesStampedPtr &msg)
     delete data_l;
     delete data_r;
     count++;
-    if(count > 100)
+    if(count > 50)
     {
       // gazebo::common::Time::Sleep(2);
       std::unique_lock<std::mutex> lk(octomap_mutex);

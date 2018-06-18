@@ -18,7 +18,7 @@
 OctomapServer::OctomapServer()
 : m_octree(NULL),
   m_maxRange(-1.0),
-  m_res(0.1),
+  m_res(0.15),
   m_treeDepth(0),
   m_maxTreeDepth(0),
   m_compressMap(true)
