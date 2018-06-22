@@ -33,30 +33,49 @@ StereoMatcher::StereoMatcher(const std::string &parameters_filename)
 		    fs["D1"] >> D1;
 		    fs["M2"] >> M2;
 		    fs["D2"] >> D2;
+		    fs["R1"] >> R1;
+		    fs["P1"] >> P1;
+		    fs["R2"] >> R2;
+		    fs["P2"] >> P2;
+		    fs["Q"] >> Q;
+    	    
+    	    int PreFilterCap = (int)fs["PreFilterCap"];
+    	    int sgbmWinSize = (int)fs["sgbmWinSize"];
+    	    int MinDisparity = (int)fs["MinDisparity"];
+    	    int UniquenessRatio = (int)fs["UniquenessRatio"];
+    	    int SpeckleWindowSize =  (int)fs["SpeckleWindowSize"];
+    	    int SpeckleRange = (int)fs["SpeckleRange"];
+    	    int Disp12MaxDiff = (int)fs["Disp12MaxDiff"];
+    	    int TextureThreshold = (int)fs["TextureThreshold"];
+    	    int Width = (int)fs["Width"];
+    	    int Height = (int)fs["Height"];
+    	    scale = (float)fs["Scale"];
+    	    
+    	    fs.release();
 
-		    fs["R"] >> R;
-		    fs["T"] >> T;
+    	    numberOfDisparities = ((Width/8) + 15) & -16;
 
-		    numberOfDisparities = ((640/8) + 15) & -16;
+    	    sgbm = cv::StereoSGBM::create(0,16,3);
+    	    sgbm->setPreFilterCap(PreFilterCap);
+    	    sgbm->setBlockSize(sgbmWinSize);
 
-		    sgbm = cv::StereoSGBM::create(0,16,3);
-		    sgbm->setPreFilterCap(10);
-		    int sgbmWinSize = 9;
-		    sgbm->setBlockSize(sgbmWinSize);
+    	    int cn = 1; //Number of channels
 
-		    int cn = 3; //Number of channels
-
-		    sgbm->setP1(8*cn*sgbmWinSize*sgbmWinSize);
-		    sgbm->setP2(32*cn*sgbmWinSize*sgbmWinSize);
-		    sgbm->setMinDisparity(0);
-		    sgbm->setNumDisparities(numberOfDisparities);
-		    sgbm->setUniquenessRatio(5);
-		    sgbm->setSpeckleWindowSize(200);
-		    sgbm->setSpeckleRange(32);
-		    sgbm->setDisp12MaxDiff(1);
-	        sgbm->setMode(cv::StereoSGBM::MODE_HH);
+    	    sgbm->setP1(8*cn*sgbmWinSize*sgbmWinSize);
+    	    sgbm->setP2(32*cn*sgbmWinSize*sgbmWinSize);
+    	    sgbm->setMinDisparity(MinDisparity);
+    	    sgbm->setNumDisparities(numberOfDisparities);
+    	    sgbm->setUniquenessRatio(UniquenessRatio);
+    	    sgbm->setSpeckleWindowSize(SpeckleWindowSize);
+    	    sgbm->setSpeckleRange(SpeckleRange);
+    	    sgbm->setDisp12MaxDiff(Disp12MaxDiff);
+            sgbm->setMode(cv::StereoSGBM::MODE_HH);
 	        // sgbm->setMode(cv::StereoSGBM::MODE_SGBM);
 	        // sgbm->setMode(cv::StereoSGBM::MODE_SGBM_3WAY);
+
+			img_size = cv::Size(Width, Height);
+	        initUndistortRectifyMap(M1, D1, R1, P1, img_size, CV_16SC2, map11, map12);
+	        initUndistortRectifyMap(M2, D2, R2, P2, img_size, CV_16SC2, map21, map22);
     	}
     	catch(cv::Exception& e )
     	{
@@ -68,11 +87,6 @@ StereoMatcher::StereoMatcher(const std::string &parameters_filename)
 
 cv::Mat StereoMatcher::matchPair(cv::Mat img1, cv::Mat img2)
 {
-	cv::Size img_size = img1.size();
-	cv::stereoRectify( M1, D1, M2, D2, img_size, R, T, R1, R2, P1, P2, Q);
-
-	initUndistortRectifyMap(M1, D1, R1, P1, img_size, CV_16SC2, map11, map12);
-	initUndistortRectifyMap(M2, D2, R2, P2, img_size, CV_16SC2, map21, map22);
 
 	if(img1.type() != 0)
 	{
@@ -82,8 +96,10 @@ cv::Mat StereoMatcher::matchPair(cv::Mat img1, cv::Mat img2)
 	remap(img1, img1r, map11, map12, cv::INTER_LINEAR);
 	remap(img2, img2r, map21, map22, cv::INTER_LINEAR);
 
-
+	resize(img1r, img1r, cv::Size(img_size.width*scale, img_size.height*scale));
+	resize(img2r, img2r, cv::Size(img_size.width*scale, img_size.height*scale));
 	sgbm->compute(img1r, img2r, disp);
+	resize(disp, disp, cv::Size(img_size.width, img_size.height));
 	disp.convertTo(disp8, CV_8U, 255/(numberOfDisparities*16.));
 	// normalize(disp, disp8, 0, 255, CV_MINMAX, CV_8U);
 

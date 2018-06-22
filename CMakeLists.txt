@@ -9,7 +9,7 @@ set(CMAKE_CXX_FLAGS_DEBUG "-g")
 set(CMAKE_CXX_FLAGS_RELEASE ${NEON_FLAGS})
 
 find_package(gazebo REQUIRED)
-find_package(OpenCV REQUIRED)
+find_package(OpenCV 3.4 REQUIRED)
 find_package(mavlink REQUIRED)
 
 include_directories(${GAZEBO_INCLUDE_DIRS} ${OpenCV_INCLUDE_DIRS} ${mavlink_INCLUDE_DIRS} ${PROJECT_SOURCE_DIR}/include)
