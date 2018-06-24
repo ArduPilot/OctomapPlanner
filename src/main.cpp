@@ -187,7 +187,14 @@ void cb(ConstImagesStampedPtr &msg)
     cv::cvtColor(image_l, image_l, CV_BGR2RGB);
     cv::cvtColor(image_r, image_r, CV_BGR2RGB);
 
-    cv::imshow("disparity",o_stereo->matchPair(image_l,image_r));
+    auto startTime = std::chrono::system_clock::now();
+    
+    cv::Mat disparity = o_stereo->matchPair(image_l,image_r);
+    
+    std::chrono::duration<double> total_elapsed = std::chrono::system_clock::now() - startTime;
+    Dbg("Disparity computation time: " << total_elapsed.count());
+    
+    cv::imshow("disparity", disparity);
 
     cv::waitKey(10);
     delete data_l;

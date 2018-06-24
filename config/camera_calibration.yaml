@@ -34,3 +34,15 @@ T: !!opencv-matrix
   cols: 1
   dt: d
   data: [ -0.2, 0., 0. ]
+
+PreFilterCap: 63
+sgbmWinSize: 9
+MinDisparity: 0
+UniquenessRatio: 4
+SpeckleWindowSize: 400
+SpeckleRange: 4
+Disp12MaxDiff: 1
+TextureThreshold: 0
+Width: 640
+Height: 480
+Scale: 1
