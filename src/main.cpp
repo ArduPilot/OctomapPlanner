@@ -46,9 +46,12 @@
 
 #include <condition_variable>
 
+#include "gazebo_visualization.h"
+
 std::shared_ptr<MavlinkComm> o_mavlink;
 std::shared_ptr<OctomapServer> o_map;
 std::shared_ptr<StereoMatcher> o_stereo;
+std::shared_ptr<GazeboVis> o_gazebovis;
 pcl::PointCloud<pcl::PointXYZRGB> final_cloud;
 int count = 0;
 boost::mutex pointcloud_mutex;
@@ -62,7 +65,7 @@ void insertCloud(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_xyz, Eigen::Matrix4f 
   Eigen::Matrix4f transform_cam_world;
   transform_cam_world << 0,0,1,0,-1,0,0,0,0,-1,0,0,0,0,0,1; //Rotate camera optical to ENU;
   pcl::transformPointCloud(*cloud_xyz, *cloud_xyz, transform_cam_world);
-  Dbg(sensorToWorld);
+  DBG(sensorToWorld);
   o_map->insertCloudCallback(cloud_xyz, sensorToWorld);
   
   std::lock_guard<std::mutex> guard(octomap_mutex);
@@ -82,7 +85,7 @@ void processCloud(cv::Mat image_l, Eigen::Matrix4f sensorToWorld)
   
   std::chrono::duration<double> total_elapsed = std::chrono::system_clock::now() - startTime;
   startTime = std::chrono::system_clock::now();
-  Dbg("Disp to pointcloud: " << total_elapsed.count());
+  DBG("Disp to pointcloud: " << total_elapsed.count());
   
   float scale = 10; // Not sure why its needed but gives correct metric scale pointcloud
 
@@ -112,7 +115,7 @@ void processCloud(cv::Mat image_l, Eigen::Matrix4f sensorToWorld)
   
   total_elapsed = std::chrono::system_clock::now() - startTime;
   startTime = std::chrono::system_clock::now();
-  Dbg("Pointcloud insertion time: " << total_elapsed.count());
+  DBG("Pointcloud insertion time: " << total_elapsed.count());
 
   // pcl::StatisticalOutlierRemoval<pcl::PointXYZ> sor;
   // sor.setInputCloud (cloud_xyz);
@@ -128,9 +131,9 @@ void processCloud(cv::Mat image_l, Eigen::Matrix4f sensorToWorld)
 
   // total_elapsed = std::chrono::system_clock::now() - startTime;
   // startTime = std::chrono::system_clock::now();
-  // Dbg"Filter time: " << total_elapsed.count());
+  // DBG"Filter time: " << total_elapsed.count());
 
-  Info("Last Pos: " << o_mavlink->pos_msg.x << " " << o_mavlink->pos_msg.y << " " << o_mavlink->pos_msg.z << " " << o_mavlink->orientation_msg.yaw);
+  INFO("Last Pos: " << o_mavlink->pos_msg.x << " " << o_mavlink->pos_msg.y << " " << o_mavlink->pos_msg.z << " " << o_mavlink->orientation_msg.yaw);
   
   std::unique_lock<std::mutex> lk(octomap_mutex);
   is_octomap_processed.wait(lk, []{return octomap_fused;});
@@ -142,7 +145,7 @@ void processCloud(cv::Mat image_l, Eigen::Matrix4f sensorToWorld)
   
   total_elapsed = std::chrono::system_clock::now() - startTime;
   startTime = std::chrono::system_clock::now();
-  Dbg("Fusion time: " << total_elapsed.count());
+  DBG("Fusion time: " << total_elapsed.count());
 
   boost::lock_guard<boost::mutex> guard(pointcloud_mutex);
   is_cloud_processed = true;
@@ -192,7 +195,7 @@ void cb(ConstImagesStampedPtr &msg)
     cv::Mat disparity = o_stereo->matchPair(image_l,image_r);
     
     std::chrono::duration<double> total_elapsed = std::chrono::system_clock::now() - startTime;
-    Dbg("Disparity computation time: " << total_elapsed.count());
+    DBG("Disparity computation time: " << total_elapsed.count());
     
     cv::imshow("disparity", disparity);
 
@@ -212,10 +215,10 @@ void cb(ConstImagesStampedPtr &msg)
     }
     else
     {
-      // Dbg(sensorToWorld);
+      // DBG(sensorToWorld);
       if(abs(sensorToWorld(2,3)) < 1e-2)
       {
-        Dbg("Z " << abs(sensorToWorld(2,3)));
+        DBG("Z " << abs(sensorToWorld(2,3)));
         count--;
       }
       else
@@ -224,6 +227,7 @@ void cb(ConstImagesStampedPtr &msg)
         boost::thread pointcloudThread(processCloud, image_l, sensorToWorld);
         pointcloudThread.detach();
         o_mavlink->gotoNED(0, -count/5, -1.5, 0);
+        o_gazebovis->addPoint(0, count/5, 1.5);
       }
     }
   }
@@ -249,7 +253,10 @@ int main(int _argc, char **_argv)
   o_stereo = std::make_shared<StereoMatcher>(std::string(SRC_DIR) + std::string("/config/camera_calibration.yaml"));
 
   boost::asio::io_service io_service;
-  
+
+  // Initialize Gazebo visualization object
+  o_gazebovis = std::make_shared<GazeboVis>();
+
   // Initialize mavlink object
   o_mavlink = std::make_shared<MavlinkComm>(14551, 14550, &io_service);
 

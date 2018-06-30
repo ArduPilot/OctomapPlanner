@@ -65,7 +65,7 @@ void OctomapServer::insertCloudCallback(PCLPointCloud::Ptr pc, const Eigen::Matr
   insertScan(sensorToWorld.block(0,3,3,1), pc_cloud);
 
   std::chrono::duration<double> total_elapsed = std::chrono::system_clock::now() - startTime;
-  Dbg("Pointcloud insertion in OctomapServer done ( " << pc_cloud.size() << " pts (cloud), " << total_elapsed.count()<< " sec)");
+  DBG("Pointcloud insertion in OctomapServer done ( " << pc_cloud.size() << " pts (cloud), " << total_elapsed.count()<< " sec)");
 
 }
 
@@ -75,7 +75,7 @@ void OctomapServer::insertScan(const Eigen::Vector3f& sensorOriginTf, const PCLP
   if (!m_octree->coordToKeyChecked(sensorOrigin, m_updateBBXMin)
     || !m_octree->coordToKeyChecked(sensorOrigin, m_updateBBXMax))
   {
-    Error("Could not generate Key for origin "<<sensorOrigin);
+    ERROR("Could not generate Key for origin "<<sensorOrigin);
   }
 
   octomap::KeySet free_cells, occupied_cells;
@@ -106,7 +106,7 @@ void OctomapServer::insertScan(const Eigen::Vector3f& sensorOriginTf, const PCLP
           updateMinKey(endKey, m_updateBBXMin);
           updateMaxKey(endKey, m_updateBBXMax);
         } else{
-          Error("Could not generate Key for endpoint "<<new_end);
+          ERROR("Could not generate Key for endpoint "<<new_end);
         }
 
 
