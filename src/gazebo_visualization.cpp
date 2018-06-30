@@ -15,7 +15,7 @@ GazeboVis::GazeboVis(){
 	_markerMsgPoint->set_type(ignition::msgs::Marker::SPHERE);
 	_markerMsgPoint->mutable_material()->mutable_script()->set_name("Gazebo/Red");
 	ignition::msgs::Set(_markerMsgPoint->mutable_scale(),
-	                  ignition::math::Vector3d(0.2, 0.2, 0.2));
+	                  ignition::math::Vector3d(0.05, 0.05, 0.05));
 
 	_prev_id_line = 1;
 	_prev_id_point = 0;
@@ -28,9 +28,14 @@ bool GazeboVis::addLine(std::vector<std::tuple<double, double, double>>& points)
 	_markerMsg->set_id(_prev_id_line);
 	_prev_id_line += 2;
 	for(auto point : points)
+	{
+		addPoint(std::get<0>(point), std::get<1>(point), std::get<2>(point));
 		ignition::msgs::Set(_markerMsg->add_point(),
 		    ignition::math::Vector3d(std::get<0>(point), std::get<1>(point), std::get<2>(point)));
-	return _node->Request("/marker", *_markerMsg.get());
+	}
+	bool success = _node->Request("/marker", *_markerMsg.get());
+	gazebo::common::Time::Sleep(0.1);
+	return success;
 }
 
 bool GazeboVis::addPoint(double x, double y, double z){

@@ -47,11 +47,13 @@
 #include <condition_variable>
 
 #include "gazebo_visualization.h"
+#include "Planner.h"
 
 std::shared_ptr<MavlinkComm> o_mavlink;
 std::shared_ptr<OctomapServer> o_map;
 std::shared_ptr<StereoMatcher> o_stereo;
 std::shared_ptr<GazeboVis> o_gazebovis;
+std::shared_ptr<Planner> o_planner;
 pcl::PointCloud<pcl::PointXYZRGB> final_cloud;
 int count = 0;
 boost::mutex pointcloud_mutex;
@@ -65,7 +67,7 @@ void insertCloud(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_xyz, Eigen::Matrix4f 
   Eigen::Matrix4f transform_cam_world;
   transform_cam_world << 0,0,1,0,-1,0,0,0,0,-1,0,0,0,0,0,1; //Rotate camera optical to ENU;
   pcl::transformPointCloud(*cloud_xyz, *cloud_xyz, transform_cam_world);
-  DBG(sensorToWorld);
+  // DBG(sensorToWorld);
   o_map->insertCloudCallback(cloud_xyz, sensorToWorld);
   
   std::lock_guard<std::mutex> guard(octomap_mutex);
@@ -209,6 +211,12 @@ void cb(ConstImagesStampedPtr &msg)
       std::unique_lock<std::mutex> lk(octomap_mutex);
       is_octomap_processed.wait(lk, []{return octomap_fused;});
       o_map->m_octree->writeBinary("map.bt");
+      o_planner->updateMap(o_map->m_octree);
+      o_planner->setStart(0,2, 1.5);
+      o_planner->setGoal(5,2, 1.5);
+      o_planner->plan();
+      auto path = o_planner->getSmoothPath();
+      o_gazebovis->addLine(path);
       // pcl::io::savePCDFile ("test_pcd.pcd", final_cloud, false);
       o_mavlink->gotoNED(0, 0, o_mavlink->pos_msg.z, 0);
       std::raise(SIGKILL);
@@ -218,7 +226,7 @@ void cb(ConstImagesStampedPtr &msg)
       // DBG(sensorToWorld);
       if(abs(sensorToWorld(2,3)) < 1e-2)
       {
-        DBG("Z " << abs(sensorToWorld(2,3)));
+        // DBG("Z " << abs(sensorToWorld(2,3)));
         count--;
       }
       else
@@ -226,8 +234,8 @@ void cb(ConstImagesStampedPtr &msg)
         is_cloud_processed = false;
         boost::thread pointcloudThread(processCloud, image_l, sensorToWorld);
         pointcloudThread.detach();
-        o_mavlink->gotoNED(0, -count/5, -1.5, 0);
-        o_gazebovis->addPoint(0, count/5, 1.5);
+        o_mavlink->gotoNED(0, -count/10.0, -1.5, 0);
+        // o_gazebovis->addPoint(0.0, count/10.0, 1.5);
       }
     }
   }
@@ -256,7 +264,10 @@ int main(int _argc, char **_argv)
 
   // Initialize Gazebo visualization object
   o_gazebovis = std::make_shared<GazeboVis>();
-
+  o_gazebovis->clearAll();
+  
+  // Initialize Planner object
+  o_planner = std::make_shared<Planner>();
   // Initialize mavlink object
   o_mavlink = std::make_shared<MavlinkComm>(14551, 14550, &io_service);
 

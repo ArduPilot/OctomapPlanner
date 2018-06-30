@@ -15,11 +15,13 @@
 #include <iostream>
 
 #include <fcl/config.h>
-#include <fcl/octree.h>
-#include <fcl/traversal/traversal_node_octree.h>
-#include <fcl/collision.h>
-#include <fcl/broadphase/broadphase.h>
-#include <fcl/math/transform.h>
+#include <fcl/fcl.h>
+#include <fcl/geometry/collision_geometry.h>
+#include <fcl/geometry/octree/octree.h>
+// #include <fcl/traversal/traversal_node_octree.h>
+// #include <fcl/collision.h>
+// #include <fcl/broadphase/broadphase.h>
+// #include <fcl/math/transform.h>
 
 namespace ob = ompl::base;
 namespace og = ompl::geometric;
@@ -27,7 +29,22 @@ namespace og = ompl::geometric;
 class Planner {
 public:
 	Planner();
-	~Planner();	
+	~Planner();
+
+	void init_start(void);
+
+	void setStart(double x, double y, double z);
+
+	void setGoal(double x, double y, double z);
+
+	void updateMap(octomap::OcTree* tree_oct);
+
+	void plan(void);
+
+	void replan(void);
+
+	std::vector<std::tuple<double, double, double>> getSmoothPath();
+
 private:
 
 	// construct the state space we are planning in
@@ -46,30 +63,20 @@ private:
 
 	bool replan_flag = false;
 
-	std::shared_ptr<fcl::CollisionGeometry> Quadcopter;
+	std::shared_ptr<fcl::CollisionGeometry<double>> Quadcopter;
 
-	std::shared_ptr<fcl::CollisionGeometry> tree_obj;
+	std::shared_ptr<fcl::CollisionGeometry<double>> tree_obj;
 
 	// Flag for initialization
 	bool set_start = false;
 
-	void init_start(void);
-
-	void setStart(double x, double y, double z);
-
-	void setGoal(double x, double y, double z);
-
-	void updateMap(std::shared_ptr<fcl::CollisionGeometry> map);
-
-	void plan(void);
-
-	void replan(void);
 
 	bool isStateValid(const ob::State *state);
 
 	ob::OptimizationObjectivePtr getThresholdPathLengthObj(const ob::SpaceInformationPtr& si);
 
 	ob::OptimizationObjectivePtr getPathLengthObjWithCostToGo(const ob::SpaceInformationPtr& si);
+
 
 };
 

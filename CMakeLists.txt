@@ -40,15 +40,17 @@ find_package(fcl REQUIRED)
 
 add_library(Planner SHARED src/Planner.cpp)
 include_directories(${OMPL_INCLUDE_DIRS} ${fcl_INCLUDE_DIRS})
-target_link_libraries(Planner ${OCTOMAP_LIBRARIES} ${fcl_LIBRARIES} ${OMPL_LIBRARIES})
+message("Libs: ${OCTOMAP_LIBRARIES}")
+target_link_libraries(Planner fcl ${OCTOMAP_LIBRARIES} ${OMPL_LIBRARIES})
 ##
 
 ## Gazebo visualizations
 find_package(gazebo REQUIRED)
 if("${GAZEBO_VERSION}" VERSION_LESS "8.0")
+    message("Not going to build visualizations")
     message(FATAL_ERROR "You need at least Gazebo 8.0. Your version: ${GAZEBO_VERSION}")
 else()
-    message("Gazebo version: ${GAZEBO_VERSION} Not going to build visualizations")
+    message("Gazebo version: ${GAZEBO_VERSION}")
 endif()
 
 link_directories(${GAZEBO_LIBRARY_DIRS})
@@ -65,7 +67,7 @@ include_directories(${PCL_INCLUDE_DIRS})
 add_definitions(${PCL_DEFINITIONS})
 
 add_executable(main_node src/main.cpp)
-target_link_libraries(main_node ${GAZEBO_LIBRARIES} ${OpenCV_LIBS} ${PCL_COMMON_LIBRARIES} ${PCL_IO_LIBRARIES} pthread StereoMatcher OctomapServer MavlinkComm GazeboVis)
+target_link_libraries(main_node ${GAZEBO_LIBRARIES} ${OpenCV_LIBS} ${PCL_COMMON_LIBRARIES} ${PCL_IO_LIBRARIES} pthread StereoMatcher OctomapServer MavlinkComm GazeboVis Planner)
 target_compile_options(main_node PRIVATE "-w")
 ##
 
