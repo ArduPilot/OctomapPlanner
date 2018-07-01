@@ -3,42 +3,49 @@
 // Constructor
 Planner::Planner(void)
 {
-	Quadcopter = std::shared_ptr<fcl::CollisionGeometry<double>>(new fcl::Box<double>(0.3, 0.3, 0.1));
+	aircraftObject = std::make_shared<fcl::CollisionObject<double>>(std::shared_ptr<fcl::CollisionGeometry<double>>(new fcl::Box<double>(1.5, 1.5, 1.0)));
 	// fcl::OcTree<double>* tree = new fcl::OcTree<double>(std::shared_ptr<const octomap::OcTree>(new octomap::OcTree(0.15)));
 	// tree_obj = std::shared_ptr<fcl::CollisionGeometry<double>>(tree);
 	
-	space = ob::StateSpacePtr(new ob::SE3StateSpace());
+	space = ob::StateSpacePtr(new ob::RealVectorStateSpace(3));
 
 	// create a start state
-	ob::ScopedState<ob::SE3StateSpace> start(space);
+	ob::ScopedState<ob::RealVectorStateSpace> start(space);
 	
 	// create a goal state
-	ob::ScopedState<ob::SE3StateSpace> goal(space);
+	ob::ScopedState<ob::RealVectorStateSpace> goal(space);
 
 	// set the bounds for the R^3 part of SE(3)
 	ob::RealVectorBounds bounds(3);
 
-	bounds.setLow(0,-20);
-	bounds.setHigh(0,20);
-	bounds.setLow(1,-20);
-	bounds.setHigh(1,20);
+	bounds.setLow(0,-10);
+	bounds.setHigh(0,10);
+	bounds.setLow(1,-10);
+	bounds.setHigh(1,10);
 	bounds.setLow(2,0);
-	bounds.setHigh(2,20);
+	bounds.setHigh(2,10);
 
-	space->as<ob::SE3StateSpace>()->setBounds(bounds);
+	space->as<ob::RealVectorStateSpace>()->setBounds(bounds);
 
 	// construct an instance of  space information from this state space
 	si = ob::SpaceInformationPtr(new ob::SpaceInformation(space));
 
-	start->setXYZ(0,0,0);
-	start->as<ob::SO3StateSpace::StateType>(1)->setIdentity();
+	// start->setXYZ(0,0,0);
+	start->values[0] = 0;
+	start->values[1] = 0;
+	start->values[2] = 0;
+	// start->as<ob::SO3StateSpace::StateType>(1)->setIdentity();
 	// start.random();
 
-	goal->setXYZ(0,0,0);
+	// goal->setXYZ(0,0,0);
+	goal->values[0] = 0;
+	goal->values[1] = 0;
+	goal->values[2] = 0;
+
 	prev_goal[0] = 0;
 	prev_goal[1] = 0;
 	prev_goal[2] = 0;
-	goal->as<ob::SO3StateSpace::StateType>(1)->setIdentity();
+	// goal->as<ob::SO3StateSpace::StateType>(1)->setIdentity();
 	// goal.random();
 	
     // set state validity checking for this space
@@ -53,7 +60,6 @@ Planner::Planner(void)
     // set Optimizattion objective
 	pdef->setOptimizationObjective(Planner::getPathLengthObjWithCostToGo(si));
 
-	std::cout << "Initialized: " << std::endl;
 }
 
 // Destructor
@@ -63,15 +69,18 @@ Planner::~Planner()
 
 void Planner::init_start(void)
 {
-	if(!set_start)
-		std::cout << "Initialized" << std::endl;
-	set_start = true;
+	if(!set_autostart)
+		DBG("Initialized");
+	set_autostart = true;
 }
 void Planner::setStart(double x, double y, double z)
 {
-	ob::ScopedState<ob::SE3StateSpace> start(space);
-	start->setXYZ(x,y,z);
-	start->as<ob::SO3StateSpace::StateType>(1)->setIdentity();
+	ob::ScopedState<ob::RealVectorStateSpace> start(space);
+	// start->setXYZ(x,y,z);
+	start->values[0] = x;
+	start->values[1] = y;
+	start->values[2] = z;
+	// start->as<ob::SO3StateSpace::StateType>(1)->setIdentity();
 	pdef->clearStartStates();
 	pdef->addStartState(start);
 }
@@ -79,16 +88,19 @@ void Planner::setGoal(double x, double y, double z)
 {
 	if(prev_goal[0] != x || prev_goal[1] != y || prev_goal[2] != z)
 	{
-		ob::ScopedState<ob::SE3StateSpace> goal(space);
-		goal->setXYZ(x,y,z);
+		ob::ScopedState<ob::RealVectorStateSpace> goal(space);
+		// goal->setXYZ(x,y,z);
+		goal->values[0] = x;
+		goal->values[1] = y;
+		goal->values[2] = z;
 		prev_goal[0] = x;
 		prev_goal[1] = y;
 		prev_goal[2] = z;
-		goal->as<ob::SO3StateSpace::StateType>(1)->setIdentity();
+		// goal->as<ob::SO3StateSpace::StateType>(1)->setIdentity();
 		pdef->clearGoal();
 		pdef->setGoalState(goal);
-		std::cout << "Goal point set to: " << x << " " << y << " " << z << std::endl;
-		if(set_start)
+		DBG("Goal point set to: " << x << " " << y << " " << z);
+		if(set_autostart)
 			plan();
 		
 	}
@@ -97,13 +109,14 @@ void Planner::updateMap(octomap::OcTree* tree_oct)
 {
 	// convert octree to collision object
 	fcl::OcTree<double>* tree = new fcl::OcTree<double>(std::shared_ptr<const octomap::OcTree>(tree_oct));
-	tree_obj = std::shared_ptr<fcl::CollisionGeometry<double>>(tree);
+	std::shared_ptr<fcl::CollisionGeometry<double>> tree_obj = std::shared_ptr<fcl::CollisionGeometry<double>>(tree);
+	treeObj = std::make_shared<fcl::CollisionObject<double>>((tree_obj));
 }
 void Planner::replan(void)
 {
-	if(path_smooth != NULL && set_start)
+	if(path_smooth != NULL && set_autostart)
 	{
-		std::cout << "Total Points:" << path_smooth->getStateCount () << std::endl;
+		DBG("Total Points:" << path_smooth->getStateCount ());
 		if(path_smooth->getStateCount () <= 2)
 			plan();
 		else
@@ -119,7 +132,7 @@ void Planner::replan(void)
 			if(replan_flag)
 				plan();
 			else
-				std::cout << "Replanning not required" << std::endl;
+				DBG("Replanning not required");
 		}
 	}
 }
@@ -149,7 +162,7 @@ void Planner::plan(void)
 	{
         // get the goal representation from the problem definition (not the same as the goal state)
         // and inquire about the found path
-		std::cout << "Found solution:" << std::endl;
+		DBG("Found solution:");
 		ob::PathPtr path = pdef->getSolutionPath();
 		og::PathGeometric* pth = pdef->getSolutionPath()->as<og::PathGeometric>();
 		pth->printAsMatrix(std::cout);
@@ -163,7 +176,7 @@ void Planner::plan(void)
 		path_smooth = new og::PathGeometric(dynamic_cast<const og::PathGeometric&>(*pdef->getSolutionPath()));
 		pathBSpline->smoothBSpline(*path_smooth,3);
 
-		// std::cout << "Smoothed Path" << std::endl;
+		// DBG("Smoothed Path");
 		// path_smooth.print(std::cout);
 		
 		// Clear memory
@@ -172,30 +185,21 @@ void Planner::plan(void)
 
 	}
 	else
-		std::cout << "No solution found" << std::endl;
+		DBG("No solution found");
 }
 
 bool Planner::isStateValid(const ob::State *state)
 {
     // cast the abstract state type to the type we expect
-	const ob::SE3StateSpace::StateType *se3state = state->as<ob::SE3StateSpace::StateType>();
+	const ob::RealVectorStateSpace::StateType *pos = state->as<ob::RealVectorStateSpace::StateType>();
 
-    // extract the first component of the state and cast it to what we expect
-	const ob::RealVectorStateSpace::StateType *pos = se3state->as<ob::RealVectorStateSpace::StateType>(0);
-
-    // extract the second component of the state and cast it to what we expect
-	const ob::SO3StateSpace::StateType *rot = se3state->as<ob::SO3StateSpace::StateType>(1);
-
-	fcl::CollisionObject<double> treeObj((tree_obj));
-	fcl::CollisionObject<double> aircraftObject(Quadcopter);
-
-    // check validity of state defined by pos & rot
+    // check validity of state defined by pos
 	fcl::Vector3<double> translation(pos->values[0],pos->values[1],pos->values[2]);
-	fcl::Quaternion<double> rotation(rot->w, rot->x, rot->y, rot->z);
-	aircraftObject.setTransform(rotation, translation);
+
+	aircraftObject->setTranslation(translation);
 	fcl::CollisionRequest<double> requestType(1,false,1,false);
 	fcl::CollisionResult<double> collisionResult;
-	fcl::collide(&aircraftObject, &treeObj, requestType, collisionResult);
+	fcl::collide(aircraftObject.get(), treeObj.get(), requestType, collisionResult);
 
 	return(!collisionResult.isCollision());
 }
@@ -225,10 +229,7 @@ std::vector<std::tuple<double, double, double>> Planner::getSmoothPath()
 	for (std::size_t idx = 0; idx < path_smooth->getStateCount (); idx++)
 	{
         // cast the abstract state type to the type we expect
-		const ob::SE3StateSpace::StateType *se3state = path_smooth->getState(idx)->as<ob::SE3StateSpace::StateType>();
-		// extract the first component of the state and cast it to what we expect
-		const ob::RealVectorStateSpace::StateType *pos = se3state->as<ob::RealVectorStateSpace::StateType>(0);
-
+		const ob::RealVectorStateSpace::StateType *pos = path_smooth->getState(idx)->as<ob::RealVectorStateSpace::StateType>();
 		path.push_back(std::tuple<double, double, double>(pos->values[0], pos->values[1], pos->values[2]));
 	}
 

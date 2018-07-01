@@ -18,10 +18,8 @@
 #include <fcl/fcl.h>
 #include <fcl/geometry/collision_geometry.h>
 #include <fcl/geometry/octree/octree.h>
-// #include <fcl/traversal/traversal_node_octree.h>
-// #include <fcl/collision.h>
-// #include <fcl/broadphase/broadphase.h>
-// #include <fcl/math/transform.h>
+
+#include "debug_definitions.h"
 
 namespace ob = ompl::base;
 namespace og = ompl::geometric;
@@ -63,12 +61,15 @@ private:
 
 	bool replan_flag = false;
 
-	std::shared_ptr<fcl::CollisionGeometry<double>> Quadcopter;
+	// std::shared_ptr<fcl::CollisionGeometry<double>> Quadcopter;
 
-	std::shared_ptr<fcl::CollisionGeometry<double>> tree_obj;
+	// std::shared_ptr<fcl::CollisionGeometry<double>> tree_obj;
 
+	std::shared_ptr<fcl::CollisionObject<double>> treeObj;
+
+	std::shared_ptr<fcl::CollisionObject<double>> aircraftObject;
 	// Flag for initialization
-	bool set_start = false;
+	bool set_autostart = false;
 
 
 	bool isStateValid(const ob::State *state);
@@ -79,43 +80,5 @@ private:
 
 
 };
-
-
-// void octomapCallback(const octomap_msgs::Octomap::ConstPtr &msg, planner* planner_ptr)
-// {
-
-
-//     //loading octree from binary
-// 	 // const std::string filename = "/home/rrc/power_plant.bt";
-// 	 // octomap::OcTree temp_tree(0.1);
-// 	 // temp_tree.readBinary(filename);
-// 	 // fcl::OcTree* tree = new fcl::OcTree(std::shared_ptr<const octomap::OcTree>(&temp_tree));
-	
-
-// 	// convert octree to collision object
-// 	octomap::OcTree* tree_oct = dynamic_cast<octomap::OcTree*>(octomap_msgs::msgToMap(*msg));
-// 	fcl::OcTree* tree = new fcl::OcTree(std::shared_ptr<const octomap::OcTree>(tree_oct));
-	
-// 	// Update the octree used for collision checking
-// 	planner_ptr->updateMap(std::shared_ptr<fcl::CollisionGeometry>(tree));
-// 	planner_ptr->replan();
-// }
-
-// void odomCb(const nav_msgs::Odometry::ConstPtr &msg, planner* planner_ptr)
-// {
-// 	planner_ptr->setStart(msg->pose.pose.position.x, msg->pose.pose.position.y, msg->pose.pose.position.z);
-// 	planner_ptr->init_start();
-// }
-
-// void startCb(const geometry_msgs::PointStamped::ConstPtr &msg, planner* planner_ptr)
-// {
-// 	planner_ptr->setStart(msg->point.x, msg->point.y, msg->point.z);
-// 	planner_ptr->init_start();
-// }
-
-// void goalCb(const geometry_msgs::PointStamped::ConstPtr &msg, planner* planner_ptr)
-// {
-// 	planner_ptr->setGoal(msg->point.x, msg->point.y, msg->point.z);
-// }
 
 #endif

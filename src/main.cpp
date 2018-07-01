@@ -36,6 +36,7 @@
 #include <boost/asio.hpp>
 #include <boost/thread/thread.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
+#include <boost/range/adaptor/reversed.hpp>
 
 #include <csignal> // for SIGTERM
 #include <mutex>
@@ -58,7 +59,7 @@ pcl::PointCloud<pcl::PointXYZRGB> final_cloud;
 int count = 0;
 boost::mutex pointcloud_mutex;
 std::mutex octomap_mutex;
-bool is_cloud_processed = true, octomap_fused = true;
+bool is_cloud_processed = true, octomap_fused = true, planner_called = false;
 std::condition_variable is_octomap_processed;
 
 void insertCloud(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_xyz, Eigen::Matrix4f sensorToWorld)
@@ -152,6 +153,36 @@ void processCloud(cv::Mat image_l, Eigen::Matrix4f sensorToWorld)
   boost::lock_guard<boost::mutex> guard(pointcloud_mutex);
   is_cloud_processed = true;
 }
+void plannerCb()
+{
+	o_gazebovis->clearAll();
+	o_gazebovis->addPoint(0, 2, 1.5);
+	o_mavlink->gotoNED(0, -2, -1.5,0); // goto start
+	usleep(3e6);
+	o_planner->updateMap(o_map->m_octree);
+	o_planner->setStart(0, 2, 1.5);
+	o_planner->setGoal(5, 2, 1.5);
+	o_planner->plan();
+	auto path = o_planner->getSmoothPath();
+	o_gazebovis->addLine(path);
+	size_t num_points = path.size();
+	double pause = 1e7/(double)num_points; // 10 seconds for path i.e. 0.5m/s
+	for (auto pose: path)
+	{
+		o_mavlink->gotoNED(std::get<0>(pose), -std::get<1>(pose), -std::get<2>(pose),0);
+		usleep(pause);
+	}
+	usleep(5e6);
+	for (auto pose: boost::adaptors::reverse(path))
+	{
+		o_mavlink->gotoNED(std::get<0>(pose), -std::get<1>(pose), -std::get<2>(pose),0);
+		usleep(pause);
+	}
+	usleep(2e6);
+	// pcl::io::savePCDFile ("test_pcd.pcd", final_cloud, false);
+	o_mavlink->gotoNED(0, 0, o_mavlink->pos_msg.z, 0);
+	std::raise(SIGKILL);
+}
 
 // Function is called everytime an image message is received.
 void cb(ConstImagesStampedPtr &msg)
@@ -207,19 +238,15 @@ void cb(ConstImagesStampedPtr &msg)
     count++;
     if(count > 50)
     {
-      // gazebo::common::Time::Sleep(2);
-      std::unique_lock<std::mutex> lk(octomap_mutex);
-      is_octomap_processed.wait(lk, []{return octomap_fused;});
-      o_map->m_octree->writeBinary("map.bt");
-      o_planner->updateMap(o_map->m_octree);
-      o_planner->setStart(0,2, 1.5);
-      o_planner->setGoal(5,2, 1.5);
-      o_planner->plan();
-      auto path = o_planner->getSmoothPath();
-      o_gazebovis->addLine(path);
-      // pcl::io::savePCDFile ("test_pcd.pcd", final_cloud, false);
-      o_mavlink->gotoNED(0, 0, o_mavlink->pos_msg.z, 0);
-      std::raise(SIGKILL);
+      if(!planner_called)
+      {
+	      planner_called = true;
+	      std::unique_lock<std::mutex> lk(octomap_mutex);
+	      is_octomap_processed.wait(lk, []{return octomap_fused;});
+	      o_map->m_octree->writeBinary("map.bt");
+	      boost::thread planner_thread(plannerCb);
+	      planner_thread.detach();
+	  }
     }
     else
     {
@@ -235,7 +262,7 @@ void cb(ConstImagesStampedPtr &msg)
         boost::thread pointcloudThread(processCloud, image_l, sensorToWorld);
         pointcloudThread.detach();
         o_mavlink->gotoNED(0, -count/10.0, -1.5, 0);
-        // o_gazebovis->addPoint(0.0, count/10.0, 1.5);
+        o_gazebovis->addPoint(0.0, count/10.0, 1.5);
       }
     }
   }
@@ -265,7 +292,7 @@ int main(int _argc, char **_argv)
   // Initialize Gazebo visualization object
   o_gazebovis = std::make_shared<GazeboVis>();
   o_gazebovis->clearAll();
-  
+
   // Initialize Planner object
   o_planner = std::make_shared<Planner>();
   // Initialize mavlink object
