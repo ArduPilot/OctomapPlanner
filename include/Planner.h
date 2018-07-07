@@ -29,17 +29,15 @@ public:
 	Planner();
 	~Planner();
 
-	void init_start(void);
-
-	void setStart(double x, double y, double z);
+	bool setStart(double x, double y, double z);
 
 	void setGoal(double x, double y, double z);
 
-	void updateMap(octomap::OcTree* tree_oct);
+	void updateMap(octomap::OcTree tree_oct);
 
 	void plan(void);
 
-	void replan(void);
+	bool replan(void);
 
 	std::vector<std::tuple<double, double, double>> getSmoothPath();
 
@@ -59,25 +57,17 @@ private:
 
 	og::PathGeometric* path_smooth = NULL;
 
-	bool replan_flag = false;
-
-	// std::shared_ptr<fcl::CollisionGeometry<double>> Quadcopter;
-
-	// std::shared_ptr<fcl::CollisionGeometry<double>> tree_obj;
+	bool replan_flag = true;
 
 	std::shared_ptr<fcl::CollisionObject<double>> treeObj;
 
 	std::shared_ptr<fcl::CollisionObject<double>> aircraftObject;
-	// Flag for initialization
-	bool set_autostart = false;
-
 
 	bool isStateValid(const ob::State *state);
 
-	ob::OptimizationObjectivePtr getThresholdPathLengthObj(const ob::SpaceInformationPtr& si);
+	// ob::OptimizationObjectivePtr getThresholdPathLengthObj(const ob::SpaceInformationPtr& si);
 
 	ob::OptimizationObjectivePtr getPathLengthObjWithCostToGo(const ob::SpaceInformationPtr& si);
-
 
 };
 

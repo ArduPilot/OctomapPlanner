@@ -39,8 +39,8 @@ PreFilterCap: 63
 sgbmWinSize: 9
 MinDisparity: 0
 UniquenessRatio: 4
-SpeckleWindowSize: 400
-SpeckleRange: 4
+SpeckleWindowSize: 1000
+SpeckleRange: 1
 Disp12MaxDiff: 1
 TextureThreshold: 0
 Width: 640

@@ -66,7 +66,7 @@ find_package(PCL REQUIRED COMPONENTS common io visualization sample_consensus fi
 include_directories(${PCL_INCLUDE_DIRS})
 add_definitions(${PCL_DEFINITIONS})
 
-add_executable(main_node src/main.cpp)
+add_executable(main_node src/main_node.cpp)
 target_link_libraries(main_node ${GAZEBO_LIBRARIES} ${OpenCV_LIBS} ${PCL_COMMON_LIBRARIES} ${PCL_IO_LIBRARIES} pthread StereoMatcher OctomapServer MavlinkComm GazeboVis Planner)
 target_compile_options(main_node PRIVATE "-w")
 ##

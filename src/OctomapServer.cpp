@@ -26,7 +26,7 @@ OctomapServer::OctomapServer()
 {
   double probHit, probMiss, thresMin, thresMax;
 
-  probHit = 0.65;
+  probHit = 0.6;
   probMiss = 0.4;
   thresMin = 0.12;
   thresMax = 0.97;
@@ -65,7 +65,7 @@ void OctomapServer::insertCloudCallback(PCLPointCloud::Ptr pc, const Eigen::Matr
   insertScan(sensorToWorld.block(0,3,3,1), pc_cloud);
 
   std::chrono::duration<double> total_elapsed = std::chrono::system_clock::now() - startTime;
-  DBG("Pointcloud insertion in OctomapServer done ( " << pc_cloud.size() << " pts (cloud), " << total_elapsed.count()<< " sec)");
+  // DBG("Pointcloud insertion in OctomapServer done ( " << pc_cloud.size() << " pts (cloud), " << total_elapsed.count()<< " sec)");
 
 }
 

@@ -35,7 +35,7 @@ bool GazeboVis::addLine(std::vector<std::tuple<double, double, double>>& points)
 		    ignition::math::Vector3d(std::get<0>(point), std::get<1>(point), std::get<2>(point)));
 	}
 	bool success = _node->Request("/marker", *_markerMsg.get());
-	gazebo::common::Time::Sleep(0.5);
+	gazebo::common::Time::MSleep(1);
 	return success;
 }
 
@@ -44,7 +44,7 @@ bool GazeboVis::addPoint(double x, double y, double z){
 	_markerMsgPoint->set_action(ignition::msgs::Marker::ADD_MODIFY);
 	_markerMsgPoint->set_id(_prev_id_point);
 	_prev_id_point += 2;
-	DBG("ID: " << _prev_id_point << " Pos: " << x << " " << y << " " << z);
+	// DBG("ID: " << _prev_id_point << " Pos: " << x << " " << y << " " << z);
 	ignition::msgs::Set(_markerMsgPoint->mutable_pose(),
 	                    ignition::math::Pose3d(x, y, z, 0, 0, 0));
 	return _node->Request("/marker", *_markerMsgPoint.get());
