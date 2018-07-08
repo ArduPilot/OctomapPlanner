@@ -117,7 +117,8 @@ bool Planner::replan(void)
 {	
 	if(path_smooth != NULL)
 	{
-		DBG("Total Points:" << path_smooth->getStateCount ());
+		og::PathGeometric* path = pdef->getSolutionPath()->as<og::PathGeometric>();
+		DBG("Total Points:" << path->getStateCount ());
 		double distance;
 		if(pdef->hasApproximateSolution())
 		{
@@ -126,12 +127,12 @@ bool Planner::replan(void)
 		}
 		else
 		{
-			for (std::size_t idx = 0; idx < path_smooth->getStateCount (); idx++)
+			for (std::size_t idx = 0; idx < path->getStateCount (); idx++)
 			{
 				if(!replan_flag)
 				{
 					// const ob::RealVectorStateSpace::StateType *pos = path_smooth->getState(idx)->as<ob::RealVectorStateSpace::StateType>();
-					replan_flag = !isStateValid(path_smooth->getState(idx));
+					replan_flag = !isStateValid(path->getState(idx));
 				}
 				else
 					break;
@@ -141,7 +142,9 @@ bool Planner::replan(void)
 	if(replan_flag)
 	{
 		DBG("Replanning");
-		plan();
+		pdef->clearSolutionPaths();
+		boost::thread planner_thread(boost::bind(&Planner::plan, this));
+		planner_thread.join();
 		return true;
 	}
 	else
@@ -169,8 +172,8 @@ void Planner::plan(void)
     // print the problem settings
 	// pdef->print(std::cout);
 
-    // attempt to solve the problem within three seconds of planning time
-	ob::PlannerStatus solved = plan->solve(3);
+    // attempt to solve the problem within four seconds of planning time
+	ob::PlannerStatus solved = plan->solve(4);
 
 	if (solved)
 	{
@@ -188,12 +191,13 @@ void Planner::plan(void)
 		og::PathSimplifier* pathBSpline = new og::PathSimplifier(si);
 		path_smooth = new og::PathGeometric(dynamic_cast<const og::PathGeometric&>(*pdef->getSolutionPath()));
 		pathBSpline->smoothBSpline(*path_smooth);
+		pathBSpline->collapseCloseVertices(*path_smooth);
 
 		// DBG("Smoothed Path");
 		// path_smooth.print(std::cout);
 		
 		// Clear memory
-		pdef->clearSolutionPaths();
+		// pdef->clearSolutionPaths();
 		replan_flag = false;
 
 	}
@@ -225,7 +229,7 @@ bool Planner::isStateValid(const ob::State *state)
 ob::OptimizationObjectivePtr Planner::getPathLengthObjWithCostToGo(const ob::SpaceInformationPtr& si)
 {
 	ob::OptimizationObjectivePtr obj(new ob::PathLengthOptimizationObjective(si));
-	obj->setCostToGoHeuristic(&ob::goalRegionCostToGo);
+	// obj->setCostToGoHeuristic(&ob::goalRegionCostToGo);
 	return obj;
 }
 

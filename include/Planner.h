@@ -13,6 +13,7 @@
 
 #include <ompl/config.h>
 #include <iostream>
+#include <boost/thread/thread.hpp>
 
 #include <fcl/config.h>
 #include <fcl/fcl.h>

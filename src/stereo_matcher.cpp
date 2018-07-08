@@ -36,45 +36,45 @@ StereoMatcher::StereoMatcher(const std::string &parameters_filename)
 		    fs["R"] >> R;
 		    fs["T"] >> T;
     	    
-    	    int PreFilterCap = (int)fs["PreFilterCap"];
-    	    int sgbmWinSize = (int)fs["sgbmWinSize"];
-    	    int MinDisparity = (int)fs["MinDisparity"];
-    	    int UniquenessRatio = (int)fs["UniquenessRatio"];
-    	    int SpeckleWindowSize =  (int)fs["SpeckleWindowSize"];
-    	    int SpeckleRange = (int)fs["SpeckleRange"];
-    	    int Disp12MaxDiff = (int)fs["Disp12MaxDiff"];
-    	    int TextureThreshold = (int)fs["TextureThreshold"];
-    	    int Width = (int)fs["Width"];
-    	    int Height = (int)fs["Height"];
-    	    scale = (float)fs["Scale"];
-    	    
-    	    fs.release();
+  	    int PreFilterCap = (int)fs["PreFilterCap"];
+  	    int sgbmWinSize = (int)fs["sgbmWinSize"];
+  	    int MinDisparity = (int)fs["MinDisparity"];
+  	    int UniquenessRatio = (int)fs["UniquenessRatio"];
+  	    int SpeckleWindowSize =  (int)fs["SpeckleWindowSize"];
+  	    int SpeckleRange = (int)fs["SpeckleRange"];
+  	    int Disp12MaxDiff = (int)fs["Disp12MaxDiff"];
+  	    int TextureThreshold = (int)fs["TextureThreshold"];
+  	    int Width = (int)fs["Width"];
+  	    int Height = (int)fs["Height"];
+  	    scale = (float)fs["Scale"];
+  	    
+  	    fs.release();
 
-    	    numberOfDisparities = ((Width/8) + 15) & -16;
+  	    numberOfDisparities = ((Width/8) + 15) & -16;
 
-    	    sgbm = cv::StereoSGBM::create(0,16,3);
-    	    sgbm->setPreFilterCap(PreFilterCap);
-    	    sgbm->setBlockSize(sgbmWinSize);
+  	    sgbm = cv::StereoSGBM::create(0,16,3);
+  	    sgbm->setPreFilterCap(PreFilterCap);
+  	    sgbm->setBlockSize(sgbmWinSize);
 
-    	    int cn = 1; //Number of channels
+  	    int cn = 1; //Number of channels
 
-    	    sgbm->setP1(8*cn*sgbmWinSize*sgbmWinSize);
-    	    sgbm->setP2(32*cn*sgbmWinSize*sgbmWinSize);
-    	    sgbm->setMinDisparity(MinDisparity);
-    	    sgbm->setNumDisparities(numberOfDisparities);
-    	    sgbm->setUniquenessRatio(UniquenessRatio);
-    	    sgbm->setSpeckleWindowSize(SpeckleWindowSize);
-    	    sgbm->setSpeckleRange(SpeckleRange);
-    	    sgbm->setDisp12MaxDiff(Disp12MaxDiff);
-            sgbm->setMode(cv::StereoSGBM::MODE_HH);
-	        // sgbm->setMode(cv::StereoSGBM::MODE_SGBM);
-	        // sgbm->setMode(cv::StereoSGBM::MODE_SGBM_3WAY);
+  	    sgbm->setP1(8*cn*sgbmWinSize*sgbmWinSize);
+  	    sgbm->setP2(32*cn*sgbmWinSize*sgbmWinSize);
+  	    sgbm->setMinDisparity(MinDisparity);
+  	    sgbm->setNumDisparities(numberOfDisparities);
+  	    sgbm->setUniquenessRatio(UniquenessRatio);
+  	    sgbm->setSpeckleWindowSize(SpeckleWindowSize);
+  	    sgbm->setSpeckleRange(SpeckleRange);
+  	    sgbm->setDisp12MaxDiff(Disp12MaxDiff);
+        sgbm->setMode(cv::StereoSGBM::MODE_HH);
+        sgbm->setMode(cv::StereoSGBM::MODE_SGBM);
+        // sgbm->setMode(cv::StereoSGBM::MODE_SGBM_3WAY);
 
-			img_size = cv::Size(Width, Height);
-			cv::stereoRectify( M1, D1, M2, D2, img_size, R, T, R1, R2, P1, P2, Q);
+  			img_size = cv::Size(Width, Height);
+  			cv::stereoRectify( M1, D1, M2, D2, img_size, R, T, R1, R2, P1, P2, Q);
 
-			initUndistortRectifyMap(M1, D1, R1, P1, img_size, CV_16SC2, map11, map12);
-			initUndistortRectifyMap(M2, D2, R2, P2, img_size, CV_16SC2, map21, map22);
+  			initUndistortRectifyMap(M1, D1, R1, P1, img_size, CV_16SC2, map11, map12);
+  			initUndistortRectifyMap(M2, D2, R2, P2, img_size, CV_16SC2, map21, map22);
     	}
     	catch(cv::Exception& e )
     	{
@@ -97,6 +97,68 @@ cv::Mat StereoMatcher::matchPair(cv::Mat img1, cv::Mat img2)
 
 	resize(img1r, img1r, cv::Size(img_size.width*scale, img_size.height*scale));
 	resize(img2r, img2r, cv::Size(img_size.width*scale, img_size.height*scale));
+  std::string parameters_filename = std::string(SRC_DIR) + std::string("/config/camera_calibration.yaml");
+  cv::FileStorage fs(parameters_filename, cv::FileStorage::READ);
+  if(!fs.isOpened())
+  {
+      printf("Failed to open file %s\n", parameters_filename.c_str());
+      throw -1;
+  }
+  try
+  {
+    fs["M1"] >> M1;
+    fs["D1"] >> D1;
+    fs["M2"] >> M2;
+    fs["D2"] >> D2;
+    fs["R"] >> R;
+    fs["T"] >> T;
+      
+    int PreFilterCap = (int)fs["PreFilterCap"];
+    int sgbmWinSize = (int)fs["sgbmWinSize"];
+    int MinDisparity = (int)fs["MinDisparity"];
+    int UniquenessRatio = (int)fs["UniquenessRatio"];
+    int SpeckleWindowSize =  (int)fs["SpeckleWindowSize"];
+    int SpeckleRange = (int)fs["SpeckleRange"];
+    int Disp12MaxDiff = (int)fs["Disp12MaxDiff"];
+    int TextureThreshold = (int)fs["TextureThreshold"];
+    int Width = (int)fs["Width"];
+    int Height = (int)fs["Height"];
+    scale = (float)fs["Scale"];
+    
+    fs.release();
+    std::string parameters_filename = std::string(SRC_DIR) + std::string("/config/camera_calibration.yaml");
+    numberOfDisparities = ((Width/8) + 15) & -16;
+
+    // sgbm = cv::StereoSGBM::create(0,16,3);
+    sgbm->setPreFilterCap(PreFilterCap);
+    sgbm->setBlockSize(sgbmWinSize);
+
+    int cn = 1; //Number of channels
+
+    sgbm->setP1(8*cn*sgbmWinSize*sgbmWinSize);
+    sgbm->setP2(32*cn*sgbmWinSize*sgbmWinSize);
+    sgbm->setMinDisparity(MinDisparity);
+    sgbm->setNumDisparities(numberOfDisparities);
+    sgbm->setUniquenessRatio(UniquenessRatio);
+    sgbm->setSpeckleWindowSize(SpeckleWindowSize);
+    sgbm->setSpeckleRange(SpeckleRange);
+    sgbm->setDisp12MaxDiff(Disp12MaxDiff);
+    sgbm->setMode(cv::StereoSGBM::MODE_HH);
+    // sgbm->setMode(cv::StereoSGBM::MODE_SGBM);
+    // sgbm->setMode(cv::StereoSGBM::MODE_SGBM_3WAY);
+
+    img_size = cv::Size(Width, Height);
+    cv::stereoRectify( M1, D1, M2, D2, img_size, R, T, R1, R2, P1, P2, Q);
+
+    initUndistortRectifyMap(M1, D1, R1, P1, img_size, CV_16SC2, map11, map12);
+    initUndistortRectifyMap(M2, D2, R2, P2, img_size, CV_16SC2, map21, map22);
+  }
+  catch(cv::Exception& e )
+  {
+    const char* err_msg = e.what();
+    std::cout << "exception caught: " << err_msg << std::endl;
+  }
+        // 
 	sgbm->compute(img1r, img2r, disp);
 	resize(disp, disp, cv::Size(img_size.width, img_size.height));
 	disp.convertTo(disp8, CV_8U, 255/(numberOfDisparities*16.));

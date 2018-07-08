@@ -26,7 +26,7 @@ OctomapServer::OctomapServer()
 {
   double probHit, probMiss, thresMin, thresMax;
 
-  probHit = 0.6;
+  probHit = 0.7;
   probMiss = 0.4;
   thresMin = 0.12;
   thresMax = 0.97;
