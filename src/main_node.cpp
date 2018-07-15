@@ -74,7 +74,7 @@ double velocity = 0.5;
 
 int count = 0;
 // For async replanner worker
-int replan_interval = 5; //replan every 5 seconds
+int replan_interval = 10; //replan every 5 seconds
 std::shared_ptr<boost::asio::deadline_timer> replan_timer;
 
 // For plan executor
@@ -219,6 +219,8 @@ void replanCb()
   std::unique_lock<std::mutex> lk(octomap_mutex);
   is_octomap_processed.wait(lk, []{return octomap_fused;});
   o_planner->updateMap(*o_map->m_octree);
+  o_gazebovis->clearOctree();
+  o_gazebovis->visOctree(*o_map->m_octree);
   lk.unlock();
   if(o_planner->setStart(o_mavlink->pos_msg.x, -o_mavlink->pos_msg.y, -o_mavlink->pos_msg.z))
   {

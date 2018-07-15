@@ -5,6 +5,7 @@
 #include <ignition/math.hh>
 #include <ignition/msgs.hh>
 #include <gazebo/common/Time.hh>
+#include <octomap/octomap.h>
 
 #include "debug_definitions.h"
 
@@ -23,6 +24,10 @@ public:
 
 	bool clearPreviousPoint();
 
+	void visOctree(octomap::OcTree& octree);
+
+	void clearOctree();
+
 private:
 	std::unique_ptr<ignition::transport::Node> _node;
 
@@ -30,9 +35,13 @@ private:
 	
 	std::unique_ptr<ignition::msgs::Marker> _markerMsgPoint;
 
+	std::unique_ptr<ignition::msgs::Marker> _markerMsgTree;
+
 	int _prev_id_line;
 
 	int _prev_id_point;
+	
+	int _prev_id_tree;
 };
 
 #endif
