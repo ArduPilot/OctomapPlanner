@@ -169,9 +169,7 @@ void executePlan(const boost::system::error_code& /*e*/)
         z = -std::get<2>(pose);
         distance_nearest =  std::sqrt(std::pow(x - prev_x, 2) + std::pow(y - prev_y, 2) + std::pow(z - prev_z, 2));
         if(distance_nearest < prev_distance && !init_start_pose)
-        {
           prev_distance = distance_nearest;
-        }
         else
         {
           init_start_pose = true;
@@ -394,7 +392,7 @@ int main(int _argc, char **_argv)
   // Setup plan executor async thread
   boost::asio::io_service executor_service;
   boost::asio::io_service::work executor_work(executor_service);
-  executor_timer = std::make_shared<boost::asio::deadline_timer>(replanning_service, boost::posix_time::seconds(1));
+  executor_timer = std::make_shared<boost::asio::deadline_timer>(executor_service, boost::posix_time::seconds(0));
   boost::thread executor_thread(boost::bind(&boost::asio::io_service::run, &executor_service));
   executor_timer->async_wait(executePlan);
   executor_thread.detach();
