@@ -118,7 +118,7 @@ void processCloud(Eigen::Matrix4f sensorToWorld)
      cv::Point3f point = points.at<cv::Point3f>(rows, cols);
 
      // Filter out points outside certain range of X Y and Z
-     if(scale * point.z <= 3.5 && scale * point.z >= 1.0 && scale * point.y >= -2.5 && scale * point.y <= 2.5 && scale * point.x <= 3.0 && scale * point.x >= -3.0)
+     if(scale * point.z <= 3.5 && scale * point.z >= 0.5 && scale * point.y >= -2.5 && scale * point.y <= 2.5 && scale * point.x <= 3.0 && scale * point.x >= -3.0)
      {
        pcl::PointXYZ pcl_point(scale * point.x, scale * point.y, scale * point.z); // normal PointCloud 
        cloud_xyz->push_back(pcl_point); 
@@ -174,7 +174,7 @@ void executePlan(const boost::system::error_code& /*e*/)
         {
           init_start_pose = true;
           pause = distance_nearest/velocity;
-          // o_mavlink->gotoNED(x, y, z, 0);
+          o_mavlink->gotoNED(x, y, z, std::atan2(y,x));
           prev_x = x;
           prev_y = y;
           prev_z = z;

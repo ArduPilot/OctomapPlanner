@@ -3,8 +3,8 @@ M1: !!opencv-matrix
    rows: 3
    cols: 3
    dt: d
-   data: [ 381.36115, 0., 320, 0.,
-       286.020862686, 240, 0., 0., 1. ]
+   data: [ 554.382712823, 0., 320, 0.,
+       415.787034617, 240, 0., 0., 1. ]
 D1: !!opencv-matrix
    rows: 1
    cols: 5
@@ -14,8 +14,8 @@ M2: !!opencv-matrix
    rows: 3
    cols: 3
    dt: d
-   data: [ 381.36115, 0., 320, 0.,
-       286.020862686, 240, 0., 0., 1. ]
+   data: [ 554.382712823, 0., 320, 0.,
+       415.787034617, 240, 0., 0., 1. ]
 D2: !!opencv-matrix
    rows: 1
    cols: 5
@@ -38,7 +38,7 @@ T: !!opencv-matrix
 PreFilterCap: 63
 sgbmWinSize: 5
 MinDisparity: 0
-UniquenessRatio: 60
+UniquenessRatio: 50
 SpeckleWindowSize: 100
 SpeckleRange: 10
 Disp12MaxDiff: 1

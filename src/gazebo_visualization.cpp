@@ -62,13 +62,11 @@ bool GazeboVis::clearAll(){
 
 	_markerMsg->set_action(ignition::msgs::Marker::DELETE_ALL);
 	_markerMsgPoint->set_action(ignition::msgs::Marker::DELETE_ALL);
-	_markerMsgTree->set_action(ignition::msgs::Marker::DELETE_ALL);
 
-	if(_node->Request("/marker", *_markerMsg.get()) && _node->Request("/marker", *_markerMsgPoint.get()) && _node->Request("/marker", *_markerMsgTree.get()))
+	if(_node->Request("/marker", *_markerMsg.get()) && _node->Request("/marker", *_markerMsgPoint.get()))
 	{
 		_prev_id_line = 0;
 		_prev_id_point = 0;
-		_prev_id_tree = 0;
 		return true;
 	}
 	else
@@ -90,7 +88,7 @@ bool GazeboVis::clearPreviousPoint(){
 }
 
 void GazeboVis::clearOctree(){
-	_markerMsgTree->set_action(ignition::msgs::Marker::DELETE_MARKER);
+	_markerMsgTree->set_action(ignition::msgs::Marker::DELETE_ALL);
 	_node->Request("/marker", *_markerMsgTree.get());
 	_prev_id_tree = 0;
 }
@@ -109,7 +107,7 @@ void GazeboVis::visOctree(octomap::OcTree& octree)
 			ignition::msgs::Set(_markerMsgTree->mutable_pose(),
 			                  ignition::math::Pose3d(it.getX(), it.getY(), it.getZ(), 0, 0, 0));
 			_node->Request("/marker", *_markerMsgTree.get());
-			gazebo::common::Time::MSleep(0.1);
+			// gazebo::common::Time::MSleep(0.01);
 	    }
 	}
 }
