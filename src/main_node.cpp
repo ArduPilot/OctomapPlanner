@@ -61,11 +61,12 @@ std::shared_ptr<GazeboVis> o_gazebovis;
 std::shared_ptr<Planner> o_planner;
 
 // Other variables
-boost::mutex pointcloud_mutex;
 std::mutex octomap_mutex;
 std::mutex planner_mutex;
-std::mutex newplan_mutex;
-bool is_cloud_processed = true, octomap_fused = true, planner_called = false, planner_init = false, replan_finished = true, plan_executed = false, new_plan = false;
+
+bool replan_finished = true, octomap_fused = true;
+
+std::atomic_bool new_plan(false), planner_init(false), planner_called(false), is_cloud_processed(true);
 std::condition_variable is_octomap_processed;
 std::condition_variable is_replan_processed;
 pcl::PointCloud<pcl::PointXYZRGB> final_cloud;
@@ -73,7 +74,7 @@ double velocity = 0.5;
 
 int count = 0;
 // For async replanner worker
-int replan_interval = 3; //replan every 4 seconds
+int replan_interval = 5; //replan every 5 seconds
 std::shared_ptr<boost::asio::deadline_timer> replan_timer;
 
 // For plan executor
@@ -89,8 +90,8 @@ void insertCloud(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_xyz, Eigen::Matrix4f 
 
   std::lock_guard<std::mutex> ugard(octomap_mutex);
   o_map->insertCloudCallback(cloud_xyz, sensorToWorld);
-  is_octomap_processed.notify_all();
   octomap_fused = true;
+  is_octomap_processed.notify_all();
 }
 
 // Function to fuse multiple pointclouds accoring to their transformations
@@ -100,71 +101,11 @@ void fuseCloud(pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud_xyzrgb, Eigen::Matr
   final_cloud += *cloud_xyzrgb;
 }
 
-// (Overloaded) Function to process pointcloud data 
-/*
-void processCloud(cv::Mat image_l, Eigen::Matrix4f sensorToWorld)
-{
-  auto startTime = std::chrono::system_clock::now();
-  cv::Mat points = o_stereo->getPointcloud();
-  
-  std::chrono::duration<double> total_elapsed = std::chrono::system_clock::now() - startTime;
-  startTime = std::chrono::system_clock::now();
-  // DBG("Disparity to points: " << total_elapsed.count());
-  
-  float scale = 10; // Not sure why its needed but gives correct metric scale pointcloud
-
-  pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_xyzrgb (new pcl::PointCloud<pcl::PointXYZRGB>); 
-  pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_xyz (new pcl::PointCloud<pcl::PointXYZ>); 
-
-  // Insert points to PCL pointcloud
-  for (int rows = 0; rows < points.rows; ++rows) { 
-  for (int cols = 0; cols < points.cols; ++cols) { 
-     cv::Point3f point = points.at<cv::Point3f>(rows, cols);
-
-     // Filter out points outside certain range of X Y and Z
-     if(scale * point.z <= 7.0 && scale * point.z >= 0.5 && scale * point.y >= -2.5 && scale * point.y <= 2.5 && scale * point.x <= 5.0 && scale * point.x >= -5.0)
-     {
-       pcl::PointXYZ pcl_point(scale * point.x, scale * point.y, scale * point.z); // normal PointCloud 
-
-       pcl::PointXYZRGB pcl_point_rgb;
-       pcl_point_rgb.x = scale * point.x;    // rgb PointCloud 
-       pcl_point_rgb.y = scale * point.y; 
-       pcl_point_rgb.z = scale * point.z; 
-       cv::Vec3b intensity = image_l.at<cv::Vec3b>(rows,cols); //BGR 
-       uint32_t rgb = (static_cast<uint32_t>(intensity[2]) << 16 | static_cast<uint32_t>(intensity[1]) << 8 | static_cast<uint32_t>(intensity[0])); 
-       pcl_point_rgb.rgb = *reinterpret_cast<float*>(&rgb);
-
-       cloud_xyz->push_back(pcl_point); 
-       cloud_xyzrgb->push_back(pcl_point_rgb);
-     }
-    } 
-  }
-  
-  total_elapsed = std::chrono::system_clock::now() - startTime;
-  startTime = std::chrono::system_clock::now();
-  // DBG("Pointcloud insertion time: " << total_elapsed.count());
-
-  // INFO("Last Pos: " << o_mavlink->pos_msg.x << " " << o_mavlink->pos_msg.y << " " << o_mavlink->pos_msg.z << " " << o_mavlink->orientation_msg.yaw);
-  
-  // Process octomap from the pointclouds in a new thread
-  std::unique_lock<std::mutex> lk(octomap_mutex, std::try_to_lock);
-  is_octomap_processed.wait(lk, []{return octomap_fused;});
-  boost::thread octomapThread(insertCloud, cloud_xyz, sensorToWorld);
-  octomapThread.detach();
-
-  boost::lock_guard<boost::mutex> guard(pointcloud_mutex);
-  is_cloud_processed = true;
-}
-*/
 // Function to process pointcloud data 
 void processCloud(Eigen::Matrix4f sensorToWorld)
 {
   auto startTime = std::chrono::system_clock::now();
   cv::Mat points = o_stereo->getPointcloud();
-  
-  // std::chrono::duration<double> total_elapsed = std::chrono::system_clock::now() - startTime;
-  // startTime = std::chrono::system_clock::now();
-  // DBG("Disparity to points: " << total_elapsed.count());
   
   float scale = 10; // Not sure why its needed but gives correct metric scale pointcloud
 
@@ -185,17 +126,12 @@ void processCloud(Eigen::Matrix4f sensorToWorld)
     } 
   }
   
-  // total_elapsed = std::chrono::system_clock::now() - startTime;
-  // startTime = std::chrono::system_clock::now();
-  // DBG("Pointcloud insertion time: " << total_elapsed.count());
-
   // Process octomap from the pointclouds in a new thread
-  std::unique_lock<std::mutex> lk(octomap_mutex, std::try_to_lock);
+  std::unique_lock<std::mutex> lk(octomap_mutex);
   is_octomap_processed.wait(lk, []{return octomap_fused;});
   boost::thread octomapThread(insertCloud, cloud_xyz, sensorToWorld);
   octomapThread.detach();
-
-  boost::lock_guard<boost::mutex> guard(pointcloud_mutex);
+  lk.unlock();
   is_cloud_processed = true;
 }
 // Function to initialize planner with basic parameters
@@ -203,10 +139,10 @@ void initPlanner()
 {
   o_gazebovis->clearAll();
 
-  std::unique_lock<std::mutex> lk(octomap_mutex, std::try_to_lock);
+  std::unique_lock<std::mutex> lk(octomap_mutex);
   is_octomap_processed.wait(lk, []{return octomap_fused;});
   o_planner->updateMap(*o_map->m_octree);
-
+  lk.unlock();
   o_planner->setStart(0, 0, 1.5);
   o_planner->setGoal(5, 2, 1.5);
 
@@ -216,11 +152,9 @@ void initPlanner()
 
 void executePlan(const boost::system::error_code& /*e*/)
 {
-  newplan_mutex.lock();
-  if(new_plan)
+  if(new_plan.load())
   {
     new_plan = false;
-    newplan_mutex.unlock();
     DBG("Recieved new plan for executing");
     auto path = o_planner->getSmoothPath();
     double x, y, z, prev_x = o_mavlink->pos_msg.x, prev_y = o_mavlink->pos_msg.y, prev_z = o_mavlink->pos_msg.z, pause, distance_nearest, prev_distance = std::numeric_limits<double>::max();
@@ -228,10 +162,8 @@ void executePlan(const boost::system::error_code& /*e*/)
 
     for(auto pose: path)
     {
-      newplan_mutex.lock();
-      if(!new_plan)
+      if(!new_plan.load())
       { 
-        newplan_mutex.unlock();
         x = std::get<0>(pose);
         y = -std::get<1>(pose);
         z = -std::get<2>(pose);
@@ -244,7 +176,7 @@ void executePlan(const boost::system::error_code& /*e*/)
         {
           init_start_pose = true;
           pause = distance_nearest/velocity;
-          o_mavlink->gotoNED(x, y, z, 0);
+          // o_mavlink->gotoNED(x, y, z, 0);
           prev_x = x;
           prev_y = y;
           prev_z = z;
@@ -253,30 +185,28 @@ void executePlan(const boost::system::error_code& /*e*/)
         }
       }
       else
-      {
-        newplan_mutex.unlock();
         break;
-      }
     }
-    newplan_mutex.lock();
-    if(new_plan) // If the above loop was break due to new plan then create a new executor thread
+    if(new_plan.load()) // If the above loop was break due to new plan then create a new executor thread
     {
       DBG("New plan found creating new thread");
-      newplan_mutex.unlock();
-      executor_timer->expires_from_now(boost::posix_time::seconds(0));
+      executor_timer->expires_from_now(boost::posix_time::milliseconds(1));
       executor_timer->async_wait(executePlan); 
     }
     else
     {
-      newplan_mutex.unlock();
       INFO("Reached the goal");
       o_mavlink->gotoNED(0, 0, o_mavlink->pos_msg.z, 0);
-      std::raise(SIGKILL);
+      std::unique_lock<std::mutex> lk(octomap_mutex);
+      is_octomap_processed.wait(lk, []{return octomap_fused;});
+      o_map->m_octree->writeBinary("map.bt");
+      lk.unlock();
+      INFO("octomap saved");
+      // std::raise(SIGKILL);
     }
   }
   else // If no new plan available then wait for a while and again call executor
   {
-    newplan_mutex.unlock();
     DBG("No new plan available, waiting for a second before next callback");
     executor_timer->expires_from_now(boost::posix_time::seconds(1));
     executor_timer->async_wait(executePlan);
@@ -288,9 +218,10 @@ void replanCb()
 {
   DBG("Replanner called");
   replan_finished = false;
-  std::unique_lock<std::mutex> lk(octomap_mutex, std::try_to_lock);
+  std::unique_lock<std::mutex> lk(octomap_mutex);
   is_octomap_processed.wait(lk, []{return octomap_fused;});
   o_planner->updateMap(*o_map->m_octree);
+  lk.unlock();
   if(o_planner->setStart(o_mavlink->pos_msg.x, -o_mavlink->pos_msg.y, -o_mavlink->pos_msg.z))
   {
     if(o_planner->replan())
@@ -300,35 +231,33 @@ void replanCb()
       o_gazebovis->clearAll();
       auto path = o_planner->getSmoothPath();
       o_gazebovis->addLine(path);
-      newplan_mutex.lock();
       new_plan = true;
-      newplan_mutex.unlock();
     }
   }
   else
   {
     ERROR("Invalid start state. Waiting for Octomap thread to terminate before exiting");
     
-    std::unique_lock<std::mutex> lk(octomap_mutex, std::try_to_lock);
+    std::unique_lock<std::mutex> lk(octomap_mutex);
     is_octomap_processed.wait(lk, []{return octomap_fused;});
     o_map->m_octree->writeBinary("map.bt");
+    lk.unlock();
     INFO("octomap saved");
     o_mavlink->gotoNED(0, 0, o_mavlink->pos_msg.z, 0);
     ERROR("EXITING");
     std::raise(SIGKILL);
   }
-  // INFO("Pose: " << o_mavlink->pos_msg.x << " " << -o_mavlink->pos_msg.y << " " << -o_mavlink->pos_msg.z);
 
   std::lock_guard<std::mutex> guard(planner_mutex);
-  is_replan_processed.notify_all();
   replan_finished = true;
+  is_replan_processed.notify_all();
 }
 
 // Async worker which calls replanner at replan_interval
 void replanAsync(const boost::system::error_code& /*e*/)
 { 
   DBG("Replan async test");
-  if(planner_init)
+  if(planner_init.load())
   {
     if(!replan_finished)
     {
@@ -339,7 +268,6 @@ void replanAsync(const boost::system::error_code& /*e*/)
     boost::thread replanner_thread(replanCb);
     replanner_thread.detach();
   }
-  DBG("Init wait timer");
   replan_timer->expires_from_now(boost::posix_time::seconds(replan_interval));
   replan_timer->async_wait(replanAsync);
 }
@@ -357,10 +285,8 @@ void initializeManeuver(double yaw_feedforward, Eigen::Matrix4f sensorToWorld)
 // Function is called everytime an image message is received from Gazebo
 void imageCb(ConstImagesStampedPtr &msg)
 {
-  pointcloud_mutex.lock();
-  if(is_cloud_processed)
+  if(is_cloud_processed.load())
   {
-    pointcloud_mutex.unlock();
     Eigen::Matrix4f sensorToWorld = Eigen::MatrixXf::Identity(4,4);
     Eigen::Matrix3f orientation;
 
@@ -406,7 +332,7 @@ void imageCb(ConstImagesStampedPtr &msg)
         initializeManeuver(count * 4 * 3.14/180.0 , sensorToWorld);
       else
       {
-        if(!planner_called)
+        if(!planner_called.load())
         {
           planner_called = true;
           boost::thread planner_thread(initPlanner);
@@ -414,20 +340,9 @@ void imageCb(ConstImagesStampedPtr &msg)
         }
         else
         {
-          if(count < 1000) // Keep on processing till 1000 counts and then terminate
-          {
-            is_cloud_processed = false;
-            boost::thread pointcloudThread(processCloud, sensorToWorld);
-            pointcloudThread.detach();
-          }
-          else
-          {
-            std::unique_lock<std::mutex> lk(octomap_mutex, std::try_to_lock);
-            is_octomap_processed.wait(lk, []{return octomap_fused;});
-            o_map->m_octree->writeBinary("map.bt");
-            o_mavlink->gotoNED(0, 0, o_mavlink->pos_msg.z, 0);
-            std::raise(SIGKILL);
-          }
+		  is_cloud_processed = false;
+		  boost::thread pointcloudThread(processCloud, sensorToWorld);
+		  pointcloudThread.detach();
         }
       }
       count++;
@@ -435,8 +350,6 @@ void imageCb(ConstImagesStampedPtr &msg)
     else
       DBG("Mavlink not initialized, current height " << std::abs(sensorToWorld(2,3)));
   }
-  else
-    pointcloud_mutex.unlock();
 }
 
 int main(int _argc, char **_argv)

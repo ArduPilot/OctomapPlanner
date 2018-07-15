@@ -60,6 +60,15 @@ Planner::Planner(void)
     // set Optimizattion objective
 	pdef->setOptimizationObjective(Planner::getPathLengthObjWithCostToGo(si));
 
+    // create a planner for the defined space
+	o_plan = ob::PlannerPtr(new og::InformedRRTstar(si));
+
+    // set the problem we are trying to solve for the planner
+	o_plan->setProblemDefinition(pdef);
+
+    // perform setup steps for the planner
+	o_plan->setup();
+
 }
 
 // Destructor
@@ -141,10 +150,9 @@ bool Planner::replan(void)
 	}
 	if(replan_flag)
 	{
-		DBG("Replanning");
 		pdef->clearSolutionPaths();
-		boost::thread planner_thread(boost::bind(&Planner::plan, this));
-		planner_thread.join();
+		DBG("Replanning");
+		plan();
 		return true;
 	}
 	else
@@ -157,15 +165,6 @@ bool Planner::replan(void)
 void Planner::plan(void)
 {
 
-    // create a planner for the defined space
-	ob::PlannerPtr plan(new og::InformedRRTstar(si));
-
-    // set the problem we are trying to solve for the planner
-	plan->setProblemDefinition(pdef);
-
-    // perform setup steps for the planner
-	plan->setup();
-
     // print the settings for this space
 	// si->printSettings(std::std::cout);
 
@@ -173,7 +172,7 @@ void Planner::plan(void)
 	// pdef->print(std::cout);
 
     // attempt to solve the problem within four seconds of planning time
-	ob::PlannerStatus solved = plan->solve(4);
+	ob::PlannerStatus solved = o_plan->solve(4);
 
 	if (solved)
 	{
@@ -191,7 +190,7 @@ void Planner::plan(void)
 		og::PathSimplifier* pathBSpline = new og::PathSimplifier(si);
 		path_smooth = new og::PathGeometric(dynamic_cast<const og::PathGeometric&>(*pdef->getSolutionPath()));
 		pathBSpline->smoothBSpline(*path_smooth);
-		pathBSpline->collapseCloseVertices(*path_smooth);
+		// pathBSpline->collapseCloseVertices(*path_smooth);
 
 		// DBG("Smoothed Path");
 		// path_smooth.print(std::cout);

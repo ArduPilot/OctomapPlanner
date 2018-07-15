@@ -13,7 +13,6 @@
 
 #include <ompl/config.h>
 #include <iostream>
-#include <boost/thread/thread.hpp>
 
 #include <fcl/config.h>
 #include <fcl/fcl.h>
@@ -52,6 +51,9 @@ private:
 
 	// create a problem instance
 	ob::ProblemDefinitionPtr pdef;
+
+	// Planner instance
+	ob::PlannerPtr o_plan;
 
 	// goal state
 	double prev_goal[3];
