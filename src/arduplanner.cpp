@@ -214,18 +214,16 @@ void ArduPlanner::replanCb()
 // Async worker which calls replanner at replan_interval
 void ArduPlanner::replanAsync()
 { 
-  DBG("Replan async test");
-  // if(planner_init.load())
-  // {
-    if(!replan_finished)
-    {
-      DBG("Waiting for previous replanner to terminate");
-      std::unique_lock<std::mutex> lk(planner_mutex, std::try_to_lock);
-      is_replan_processed.wait(lk, [this](){return replan_finished;});
-    }
-    boost::thread replanner_thread(boost::bind(&ArduPlanner::replanCb, this));
-    replanner_thread.detach();
-  // }
+
+  if(!replan_finished)
+  {
+    DBG("Waiting for previous replanner to terminate");
+    std::unique_lock<std::mutex> lk(planner_mutex, std::try_to_lock);
+    is_replan_processed.wait(lk, [this](){return replan_finished;});
+  }
+  boost::thread replanner_thread(boost::bind(&ArduPlanner::replanCb, this));
+  replanner_thread.detach();
+
   replan_timer->expires_from_now(boost::posix_time::seconds(replan_interval));
   replan_timer->async_wait(boost::bind(&ArduPlanner::replanAsync,this));
 }

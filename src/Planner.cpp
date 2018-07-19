@@ -3,7 +3,7 @@
 // Constructor
 Planner::Planner(void)
 {
-	aircraftObject = std::make_shared<fcl::CollisionObject<double>>(std::shared_ptr<fcl::CollisionGeometry<double>>(new fcl::Box<double>(1.5, 1.5, 1.0)));
+	aircraftObject = std::make_shared<fcl::CollisionObject<double>>(std::shared_ptr<fcl::CollisionGeometry<double>>(new fcl::Box<double>(1.5, 1.5, 1.5)));
 	// fcl::OcTree<double>* tree = new fcl::OcTree<double>(std::shared_ptr<const octomap::OcTree>(new octomap::OcTree(0.15)));
 	// tree_obj = std::shared_ptr<fcl::CollisionGeometry<double>>(tree);
 	// treeObj = std::make_shared<fcl::CollisionObject<double>>((std::shared_ptr<fcl::CollisionGeometry<double>>(tree)));
