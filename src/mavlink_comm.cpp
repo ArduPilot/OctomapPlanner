@@ -47,6 +47,7 @@ MavlinkComm::MavlinkComm(const size_t& bind_port, const size_t& remote_port, boo
 		close(sock);
 		exit(EXIT_FAILURE);
     }
+    INFO("Mavlink Initialized");
 
 }
 
@@ -80,7 +81,7 @@ void MavlinkComm::poll_data()
 							{
 								// Packet received
 								mavlink_msg_local_position_ned_decode(&msg, &pos_msg);
-								// Dbg("Pose x: " << pos_msg.x << " y: " << pos_msg.y << " z: " << pos_msg.z);
+								// DBG("Pose x: " << pos_msg.x << " y: " << pos_msg.y << " z: " << pos_msg.z);
 								break;
 							}
 						case MAVLINK_MSG_ID_ATTITUDE:

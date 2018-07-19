@@ -6,6 +6,7 @@ Planner::Planner(void)
 	aircraftObject = std::make_shared<fcl::CollisionObject<double>>(std::shared_ptr<fcl::CollisionGeometry<double>>(new fcl::Box<double>(1.5, 1.5, 1.0)));
 	// fcl::OcTree<double>* tree = new fcl::OcTree<double>(std::shared_ptr<const octomap::OcTree>(new octomap::OcTree(0.15)));
 	// tree_obj = std::shared_ptr<fcl::CollisionGeometry<double>>(tree);
+	// treeObj = std::make_shared<fcl::CollisionObject<double>>((std::shared_ptr<fcl::CollisionGeometry<double>>(tree)));
 	
 	space = ob::StateSpacePtr(new ob::RealVectorStateSpace(3));
 
@@ -22,8 +23,8 @@ Planner::Planner(void)
 	bounds.setHigh(0,10);
 	bounds.setLow(1,-10);
 	bounds.setHigh(1,10);
-	bounds.setLow(2,0);
-	bounds.setHigh(2,5);
+	bounds.setLow(2,1);
+	bounds.setHigh(2,3.5);
 
 	space->as<ob::RealVectorStateSpace>()->setBounds(bounds);
 
@@ -42,9 +43,6 @@ Planner::Planner(void)
 	goal->values[1] = 0;
 	goal->values[2] = 0;
 
-	prev_goal[0] = 0;
-	prev_goal[1] = 0;
-	prev_goal[2] = 0;
 	// goal->as<ob::SO3StateSpace::StateType>(1)->setIdentity();
 	// goal.random();
 	
@@ -69,6 +67,8 @@ Planner::Planner(void)
     // perform setup steps for the planner
 	o_plan->setup();
 
+	INFO("Planner Initialized");
+
 }
 
 // Destructor
@@ -79,7 +79,6 @@ Planner::~Planner()
 bool Planner::setStart(double x, double y, double z)
 {
 	ob::ScopedState<ob::RealVectorStateSpace> start(space);
-	// start->setXYZ(x,y,z);
 	start->values[0] = x;
 	start->values[1] = y;
 	start->values[2] = z;
@@ -87,34 +86,40 @@ bool Planner::setStart(double x, double y, double z)
 	state->as<ob::RealVectorStateSpace::StateType>()->values = start->values;
 	if(isStateValid(state)) // Check if the start state is valid
 	{	
-		// start->as<ob::SO3StateSpace::StateType>(1)->setIdentity();
 		pdef->clearStartStates();
 		pdef->addStartState(start);
 		DBG("Start point set to: " << x << " " << y << " " << z);
 		return true;
 	}
 	else
-		return false;
-}
-void Planner::setGoal(double x, double y, double z)
-{
-	if(prev_goal[0] != x || prev_goal[1] != y || prev_goal[2] != z)
 	{
-		ob::ScopedState<ob::RealVectorStateSpace> goal(space);
-		// goal->setXYZ(x,y,z);
-		goal->values[0] = x;
-		goal->values[1] = y;
-		goal->values[2] = z;
-		prev_goal[0] = x;
-		prev_goal[1] = y;
-		prev_goal[2] = z;
-		// goal->as<ob::SO3StateSpace::StateType>(1)->setIdentity();
-		pdef->clearGoal();
-		pdef->setGoalState(goal);
-		DBG("Goal point set to: " << x << " " << y << " " << z);
-
+		ERROR("Start state: " << x << " " << y << " " << z << " invalid");
+		return false;
 	}
 }
+
+bool Planner::setGoal(double x, double y, double z)
+{
+	ob::ScopedState<ob::RealVectorStateSpace> goal(space);
+	goal->values[0] = x;
+	goal->values[1] = y;
+	goal->values[2] = z;
+	pdef->clearGoal();
+	pdef->setGoalState(goal);
+	ob::State *state =  space->allocState();
+	state->as<ob::RealVectorStateSpace::StateType>()->values = goal->values;
+	if(isStateValid(state)) // Check if the goal state is valid
+	{	
+		DBG("Goal point set to: " << x << " " << y << " " << z);
+		return true;
+	}
+	else
+	{
+		ERROR("Goal state: " << x << " " << y << " " << z << " invalid");
+		return false;
+	}
+}
+
 void Planner::updateMap(octomap::OcTree tree_oct)
 {
 	// convert octree to collision object
@@ -122,6 +127,7 @@ void Planner::updateMap(octomap::OcTree tree_oct)
 	std::shared_ptr<fcl::CollisionGeometry<double>> tree_obj = std::shared_ptr<fcl::CollisionGeometry<double>>(tree);
 	treeObj = std::make_shared<fcl::CollisionObject<double>>((tree_obj));
 }
+
 bool Planner::replan(void)
 {	
 	if(path_smooth != NULL)
@@ -140,7 +146,6 @@ bool Planner::replan(void)
 			{
 				if(!replan_flag)
 				{
-					// const ob::RealVectorStateSpace::StateType *pos = path_smooth->getState(idx)->as<ob::RealVectorStateSpace::StateType>();
 					replan_flag = !isStateValid(path->getState(idx));
 				}
 				else
@@ -165,12 +170,6 @@ bool Planner::replan(void)
 void Planner::plan(void)
 {
 
-    // print the settings for this space
-	// si->printSettings(std::std::cout);
-
-    // print the problem settings
-	// pdef->print(std::cout);
-
     // attempt to solve the problem within four seconds of planning time
 	ob::PlannerStatus solved = o_plan->solve(4);
 
@@ -182,21 +181,13 @@ void Planner::plan(void)
 		ob::PathPtr path = pdef->getSolutionPath();
 		og::PathGeometric* pth = pdef->getSolutionPath()->as<og::PathGeometric>();
 		pth->printAsMatrix(std::cout);
-        // print the path to screen
-        // path->print(std::cout);
 		
         //Path smoothing using bspline
-
 		og::PathSimplifier* pathBSpline = new og::PathSimplifier(si);
 		path_smooth = new og::PathGeometric(dynamic_cast<const og::PathGeometric&>(*pdef->getSolutionPath()));
 		pathBSpline->smoothBSpline(*path_smooth);
 		// pathBSpline->collapseCloseVertices(*path_smooth);
-
-		// DBG("Smoothed Path");
-		// path_smooth.print(std::cout);
 		
-		// Clear memory
-		// pdef->clearSolutionPaths();
 		replan_flag = false;
 
 	}
@@ -232,16 +223,15 @@ ob::OptimizationObjectivePtr Planner::getPathLengthObjWithCostToGo(const ob::Spa
 	return obj;
 }
 
+
 std::vector<std::tuple<double, double, double>> Planner::getSmoothPath()
 {
 	std::vector<std::tuple<double, double, double>> path;
-
 	for (std::size_t idx = 0; idx < path_smooth->getStateCount (); idx++)
 	{
         // cast the abstract state type to the type we expect
 		const ob::RealVectorStateSpace::StateType *pos = path_smooth->getState(idx)->as<ob::RealVectorStateSpace::StateType>();
 		path.push_back(std::tuple<double, double, double>(pos->values[0], pos->values[1], pos->values[2]));
 	}
-
 	return path;
 }

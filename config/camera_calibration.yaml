@@ -36,9 +36,9 @@ T: !!opencv-matrix
   data: [ -0.2, 0., 0. ]
 
 PreFilterCap: 63
-sgbmWinSize: 5
+sgbmWinSize: 9
 MinDisparity: 0
-UniquenessRatio: 50
+UniquenessRatio: 70
 SpeckleWindowSize: 100
 SpeckleRange: 10
 Disp12MaxDiff: 1

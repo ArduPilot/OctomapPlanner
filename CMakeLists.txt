@@ -61,13 +61,18 @@ add_library(GazeboVis SHARED src/gazebo_visualization.cpp)
 target_link_libraries(GazeboVis ${GAZEBO_LIBRARIES})
 ##
 
-## Main node
-find_package(PCL REQUIRED COMPONENTS common io visualization sample_consensus filters)
+## ArduPlanner library
+find_package(PCL REQUIRED COMPONENTS common io)
 include_directories(${PCL_INCLUDE_DIRS})
 add_definitions(${PCL_DEFINITIONS})
 
+add_library(ArduPlanner SHARED src/arduplanner.cpp)
+target_link_libraries(ArduPlanner ${GAZEBO_LIBRARIES} ${OpenCV_LIBS} ${PCL_COMMON_LIBRARIES} ${PCL_IO_LIBRARIES} pthread StereoMatcher OctomapServer MavlinkComm GazeboVis Planner)
+##
+
+## Main node
 add_executable(main_node src/main_node.cpp)
-target_link_libraries(main_node ${GAZEBO_LIBRARIES} ${OpenCV_LIBS} ${PCL_COMMON_LIBRARIES} ${PCL_IO_LIBRARIES} pthread StereoMatcher OctomapServer MavlinkComm GazeboVis Planner)
+target_link_libraries(main_node ${GAZEBO_LIBRARIES} ${OpenCV_LIBS} ArduPlanner)
 target_compile_options(main_node PRIVATE "-w")
 ##
 

@@ -39,6 +39,8 @@ OctomapServer::OctomapServer()
   m_octree->setClampingThresMax(thresMax);
   m_treeDepth = m_octree->getTreeDepth();
   m_maxTreeDepth = m_treeDepth;
+
+  INFO("Octomap Initalized");
 }
 
 OctomapServer::~OctomapServer(){

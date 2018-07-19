@@ -31,7 +31,7 @@ public:
 
 	bool setStart(double x, double y, double z);
 
-	void setGoal(double x, double y, double z);
+	bool setGoal(double x, double y, double z);
 
 	void updateMap(octomap::OcTree tree_oct);
 
@@ -55,9 +55,6 @@ private:
 	// Planner instance
 	ob::PlannerPtr o_plan;
 
-	// goal state
-	double prev_goal[3];
-
 	og::PathGeometric* path_smooth = NULL;
 
 	bool replan_flag = true;
@@ -71,6 +68,7 @@ private:
 	// ob::OptimizationObjectivePtr getThresholdPathLengthObj(const ob::SpaceInformationPtr& si);
 
 	ob::OptimizationObjectivePtr getPathLengthObjWithCostToGo(const ob::SpaceInformationPtr& si);
+
 
 };
 
