@@ -23,7 +23,7 @@ Planner::Planner(void)
 	bounds.setHigh(0,10);
 	bounds.setLow(1,-10);
 	bounds.setHigh(1,10);
-	bounds.setLow(2,1);
+	bounds.setLow(2,0.5);
 	bounds.setHigh(2,3.5);
 
 	space->as<ob::RealVectorStateSpace>()->setBounds(bounds);

@@ -63,28 +63,33 @@ class ArduPlanner
 
       // void initPlannerThread();
 
-      ArduPlanner();
+      ArduPlanner(cv::Mat _start, cv::Mat _goal, double _velocity, bool _return_back, int _replan_interval, int _executor_interval, bool _visualize_octomap, double _min_rangem, double _max_range);
       ~ArduPlanner();
 
    private:
-      // Other variables
+      
+      cv::Mat start;
+      cv::Mat goal;
+
       std::mutex octomap_mutex;
       std::mutex planner_mutex;
 
-      bool replan_finished = true, octomap_fused = true;
+      bool replan_finished = true, octomap_fused = true, visualize_octomap;
 
       std::condition_variable is_octomap_processed;
       std::condition_variable is_replan_processed;
       // pcl::PointCloud<pcl::PointXYZRGB> final_cloud;
-      double velocity = 0.5;
+      double velocity = 0.2;
+
+      double min_range, max_range;
 
       // For mavlink async worker
       std::shared_ptr<boost::asio::io_service> mavlink_service;
       std::shared_ptr<boost::asio::io_service::work> mavlink_work;
       
-      int replan_interval = 10; //replan every 10 seconds
-      int executor_interval = 1; // check for new plan every 1 seconds
-      
+      int replan_interval;
+      int executor_interval;
+      bool return_back;
       
       // For async replanner worker
       std::shared_ptr<boost::asio::deadline_timer> replan_timer;

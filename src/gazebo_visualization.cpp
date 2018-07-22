@@ -107,7 +107,7 @@ void GazeboVis::visOctree(octomap::OcTree& octree)
 			ignition::msgs::Set(_markerMsgTree->mutable_pose(),
 			                  ignition::math::Pose3d(it.getX(), it.getY(), it.getZ(), 0, 0, 0));
 			_node->Request("/marker", *_markerMsgTree.get());
-			// gazebo::common::Time::MSleep(0.01);
+			gazebo::common::Time::MSleep(0.01);
 	    }
 	}
 }

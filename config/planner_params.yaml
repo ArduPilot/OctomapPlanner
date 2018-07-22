@@ -1,0 +1,20 @@
+%YAML:1.0
+start: !!opencv-matrix
+  rows: 1
+  cols: 3
+  dt: f
+  data: [0., 0., 1]
+
+goal: !!opencv-matrix
+  rows: 1
+  cols: 3
+  dt: f
+  data: [5., 1., 1]
+
+velocity: 0.5
+return_back: True
+replan_interval: 10
+executor_interval: 1
+min_range: 1.5
+max_range: 6.0
+visualize_octomap: True

@@ -1,6 +1,15 @@
 #include <arduplanner.h>
 
-ArduPlanner::ArduPlanner()
+ArduPlanner::ArduPlanner(cv::Mat _start, cv::Mat _goal, double _velocity, bool _return_back, int _replan_interval, int _executor_interval, bool _visualize_octomap, double _min_range, double _max_range):
+  start(_start),
+  goal(_goal),
+  velocity(_velocity),
+  return_back(_return_back),
+  replan_interval(_replan_interval),
+  executor_interval(_executor_interval),
+  visualize_octomap(_visualize_octomap),
+  min_range(_min_range),
+  max_range(_max_range)
 {
   // Initialize octomap object
   o_map = std::make_shared<OctomapServer>();
@@ -28,7 +37,7 @@ ArduPlanner::ArduPlanner()
   // Setup plan executor async thread
   executor_service = std::make_shared<boost::asio::io_service>();
   executor_work = std::make_shared<boost::asio::io_service::work>(*executor_service);
-  executor_timer = std::make_shared<boost::asio::deadline_timer>(*executor_service, boost::posix_time::seconds(2*replan_interval));
+  executor_timer = std::make_shared<boost::asio::deadline_timer>(*executor_service, boost::posix_time::seconds(replan_interval));
   boost::thread executor_thread(boost::bind(&boost::asio::io_service::run, &*executor_service));
   executor_timer->async_wait(boost::bind(&ArduPlanner::executePlan,this));
   executor_thread.detach();
@@ -36,7 +45,7 @@ ArduPlanner::ArduPlanner()
   // Setup replanning thread as async callback
   replanning_service = std::make_shared<boost::asio::io_service>();
   replan_work = std::make_shared<boost::asio::io_service::work>(*replanning_service);
-  replan_timer = std::make_shared<boost::asio::deadline_timer>(*replanning_service, boost::posix_time::seconds(2*replan_interval));
+  replan_timer = std::make_shared<boost::asio::deadline_timer>(*replanning_service, boost::posix_time::seconds(1.5 * replan_interval));
   boost::thread replan_thread(boost::bind(&boost::asio::io_service::run, &*replanning_service));
   replan_timer->async_wait(boost::bind(&ArduPlanner::replanAsync,this));
   replan_thread.detach();
@@ -91,7 +100,7 @@ void ArduPlanner::processCloud()
 
      // Filter out points outside certain distance
      float dist = scale * std::sqrt(point.z * point.z + point.y * point.y + point.x * point.x);
-     if(dist > 1.0 && dist < 5.0)
+     if(dist > min_range && dist < max_range)
      {
       pcl::PointXYZ pcl_point(scale * point.x, scale * point.y, scale * point.z); // normal PointCloud 
       cloud_xyz->push_back(pcl_point); 
@@ -131,7 +140,7 @@ void ArduPlanner::executePlan()
         {
           init_start_pose = true;
           pause = distance_nearest/velocity;
-          o_mavlink->gotoNED(x, y, z, std::atan2(y,x));
+          o_mavlink->gotoNED(x, y, z, std::atan2(y - prev_y,x - prev_x));
           prev_x = x;
           prev_y = y;
           prev_z = z;
@@ -151,13 +160,38 @@ void ArduPlanner::executePlan()
     else
     {
       INFO("Reached the goal");
-      o_mavlink->gotoNED(0, 0, o_mavlink->pos_msg.z, 0);
+
+      // Stop the replanner
+      replan_work.reset();
+      replanning_service->stop();
+
+      // Save the map
       std::unique_lock<std::mutex> lk(octomap_mutex);
       is_octomap_processed.wait(lk, [this](){return octomap_fused;});
       o_map->m_octree->writeBinary("map.bt");
       lk.unlock();
       INFO("octomap saved");
-      std::raise(SIGKILL);
+
+      if(return_back)
+      {
+        INFO("Returning Back");
+        for(auto pose: boost::adaptors::reverse(path))
+        {
+          x = std::get<0>(pose);
+          y = -std::get<1>(pose);
+          z = -std::get<2>(pose);
+          distance_nearest =  std::sqrt(std::pow(x - prev_x, 2) + std::pow(y - prev_y, 2) + std::pow(z - prev_z, 2));
+          pause = distance_nearest/velocity;
+          o_mavlink->gotoNED(x, y, z, std::atan2(y - prev_y,x - prev_x));
+          pause = distance_nearest/velocity;
+          prev_x = x;
+          prev_y = y;
+          prev_z = z;
+          std::this_thread::sleep_for(std::chrono::duration<double>(pause));
+        }
+        o_mavlink->gotoNED(0, 0, o_mavlink->pos_msg.z, 0);
+        std::raise(SIGKILL);
+      }
     }
   }
   else // If no new plan available then wait for a while and again call executor
@@ -176,10 +210,14 @@ void ArduPlanner::replanCb()
   std::unique_lock<std::mutex> lk(octomap_mutex);
   is_octomap_processed.wait(lk, [this](){return octomap_fused;});
   o_planner->updateMap(*o_map->m_octree);
-  o_gazebovis->clearOctree();
-  // o_gazebovis->visOctree(*o_map->m_octree);
+  if(visualize_octomap)
+  {
+    o_gazebovis->clearOctree();
+    o_gazebovis->visOctree(*o_map->m_octree);
+  }
   lk.unlock();
-  o_planner->setGoal(5, 2, 1.5);
+  
+  o_planner->setGoal(goal.at<float>(0), goal.at<float>(1), goal.at<float>(2));
   if(o_planner->setStart(o_mavlink->pos_msg.x, -o_mavlink->pos_msg.y, -o_mavlink->pos_msg.z))
   {
     if(o_planner->replan())
@@ -194,16 +232,16 @@ void ArduPlanner::replanCb()
   }
   else
   {
-    ERROR("Invalid start state. Waiting for Octomap thread to terminate before exiting");
+    ERROR("Invalid start state");
     
     std::unique_lock<std::mutex> lk(octomap_mutex);
     is_octomap_processed.wait(lk, [this](){return octomap_fused;});
     o_map->m_octree->writeBinary("map.bt");
     lk.unlock();
     INFO("octomap saved");
-    o_mavlink->gotoNED(0, 0, o_mavlink->pos_msg.z, 0);
-    ERROR("EXITING");
-    std::raise(SIGKILL);
+    // o_mavlink->gotoNED(0, 0, o_mavlink->pos_msg.z, 0);
+    // ERROR("EXITING");
+    // std::raise(SIGKILL);
   }
 
   std::lock_guard<std::mutex> guard(planner_mutex);
@@ -233,7 +271,7 @@ void ArduPlanner::initializeManeuver(double yaw_feedforward)
 {
   processCloudThread();
   INFO("Desired Yaw: " << yaw_feedforward);
-  o_mavlink->gotoNED(0, 0, -1.5, yaw_feedforward);
+  o_mavlink->gotoNED(start.at<float>(0), -start.at<float>(1), -start.at<float>(2), yaw_feedforward);
 }
 
 void ArduPlanner::updateSensorToWorld()

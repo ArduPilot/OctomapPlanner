@@ -60,6 +60,32 @@ void imageCb(ConstImagesStampedPtr &msg)
 
 int main(int _argc, char **_argv)
 {
+  int replan_interval, executor_interval;
+  cv::Mat start, goal;
+  bool return_back, visualize_octomap;
+  double velocity, min_range, max_range;
+  std::string params_file = std::string(SRC_DIR) + std::string("/config/planner_params.yaml");
+
+  // Read planner parameters from the file
+  cv::FileStorage fs(params_file, cv::FileStorage::READ);
+  if(!fs.isOpened())
+  {
+    ERROR("Failed to open planner_params.yaml\nExiting");
+    std::raise(SIGKILL);
+  }
+  else
+  {
+    fs["start"] >> start;
+    fs["goal"] >> goal;
+    fs["velocity"] >> velocity;
+    fs["return_back"] >> return_back;
+    fs["min_range"] >> min_range;
+    fs["max_range"] >> max_range;
+    fs["replan_interval"] >> replan_interval;
+    fs["executor_interval"] >> executor_interval;
+    fs["visualize_octomap"] >> visualize_octomap;
+  }
+
   // Load gazebo
   gazebo::client::setup(_argc, _argv);
 
@@ -67,7 +93,7 @@ int main(int _argc, char **_argv)
   gazebo::transport::NodePtr node(new gazebo::transport::Node());
   node->Init();
 
-  o_arduplanner = std::make_shared<ArduPlanner>();
+  o_arduplanner = std::make_shared<ArduPlanner>(start, goal, velocity, return_back, replan_interval, executor_interval, visualize_octomap, min_range, max_range);
   // Listen to Gazebo topic
   gazebo::transport::SubscriberPtr sub = node->Subscribe("~/iris/iris_demo/cam_link/stereo_camera/images", imageCb);
 
