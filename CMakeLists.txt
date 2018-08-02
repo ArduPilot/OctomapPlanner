@@ -75,5 +75,3 @@ add_executable(main_node src/main_node.cpp)
 target_link_libraries(main_node ${GAZEBO_LIBRARIES} ${OpenCV_LIBS} ArduPlanner)
 target_compile_options(main_node PRIVATE "-w")
 ##
-
-# add_executable(mavlink_test mavlink_test.c)
