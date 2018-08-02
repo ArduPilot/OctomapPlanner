@@ -56,11 +56,13 @@ fcl
 octomap
 
 ::
+
 	sudo apt install liboctomap-dev
 
 mavlink
 
 ::
+
 	git clone https://github.com/mavlink/mavlink.git
 	cd mavlink
 	git submodule update --init --recursive
@@ -72,6 +74,7 @@ mavlink
 OMPL
 
 ::
+
 	wget http://ompl.kavrakilab.org/install-ompl-ubuntu.sh
 	chmod u+x install-ompl-ubuntu.sh
 	sh install-ompl-ubuntu.sh
@@ -79,6 +82,7 @@ OMPL
 Finally, build ArduPlanner
 
 ::
+
 	git clone https://github.com/ayushgaud/arduplanner
 	cd arduplanner
 	mkdir build
@@ -92,11 +96,13 @@ Running the code
 Launch Gazebo with a demo world by executing 
 
 ::
+
 	gazebo --verbose worlds/iris_gas_station.world
 
 On a seperate terminal start ArduCopter SITL
 
 ::
+
 	sim_vehicle.py -v ArduCopter -f gazebo-iris
 
 Before launching the code you may want to edit a few parameters like start and goal location
@@ -105,4 +111,5 @@ This can be done by editing the planner_params.yaml file inside config folder
 Finally, launch the planner code by executing this inside the build folder
 
 ::
+
 	./main_node
