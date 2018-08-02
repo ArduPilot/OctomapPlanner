@@ -3,18 +3,18 @@ start: !!opencv-matrix
   rows: 1
   cols: 3
   dt: f
-  data: [0., 0., 1]
+  data: [0., 0., 1] # Start location
 
 goal: !!opencv-matrix
   rows: 1
   cols: 3
   dt: f
-  data: [5., 1., 1]
+  data: [5., 1., 1] # Goal location
 
-velocity: 0.5
-return_back: True
-replan_interval: 10
-executor_interval: 1
-min_range: 1.5
-max_range: 6.0
-visualize_octomap: True
+velocity: 0.5 # Average velocity at which the command should be executed
+return_back: True # Return back to the start location or not
+replan_interval: 10 # Time interval to wait before replanning
+executor_interval: 1 # Wait interval for planner before checking again and executing
+min_range: 1.5 # Min sensor range to start fusing pointcloud
+max_range: 6.0 # Max sensor range beyond which pointcloud is not fused
+visualize_octomap: True # Visualize octomap in Gazebo

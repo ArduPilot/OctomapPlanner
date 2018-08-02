@@ -20,8 +20,6 @@ Setup Instructions
 
 It is recommended to use Ubuntu 16.04 since all the tests have been conducted on it.
 
-Follow the steps here to install ardupilot_gazebo https://github.com/swiftgust/ardupilot_gazebo
-
 Make sure to install gazebo-8 instead of gazebo-7 since visualization messages are not supported before gazebo-8
 
 Users should first setup OSRF keys and install Gazebo 8 by executing
@@ -37,9 +35,10 @@ Users should first setup OSRF keys and install Gazebo 8 by executing
 
 ROS users can also install Gazebo 8 with ROS support after adding OSRF keys and using ros-kinetic-gazebo8-* packages
 
-After installing Gazebo you can follow the instructions given here to setup your SITL environment https://github.com/swiftgust/ardupilot_gazebo
+Follow the steps here to install ardupilot_gazebo https://github.com/swiftgust/ardupilot_gazebo
 
-We will also need to install a few other dependencies
+Dependencies Installation
+=========================
 
 fcl
 
@@ -107,7 +106,7 @@ On a seperate terminal start ArduCopter SITL
 	sim_vehicle.py -v ArduCopter -f gazebo-iris
 
 Before launching the code you may want to edit a few parameters like start and goal location
-This can be done by editing the planner_params.yaml file inside config folder
+This can be done by editing the planner_params.yaml file inside the config folder
 
 Finally, launch the planner code by executing this from the arduplanner folder
 
