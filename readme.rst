@@ -79,7 +79,7 @@ OMPL
 	chmod u+x install-ompl-ubuntu.sh
 	sh install-ompl-ubuntu.sh
 
-Finally, build ArduPlanner
+Finally, build ArduPlanner and copy the iris model for gazebo to find
 
 ::
 
@@ -89,6 +89,7 @@ Finally, build ArduPlanner
 	cd build
 	cmake ..
 	make
+	cp -r ../models/iris_with_camera ~/.gazebo/models/
 
 Running the code
 ================
@@ -97,7 +98,7 @@ Launch Gazebo with a demo world by executing
 
 ::
 
-	gazebo --verbose worlds/iris_gas_station.world
+	gazebo --verbose worlds/iris_gas_station_demo.world
 
 On a seperate terminal start ArduCopter SITL
 
@@ -108,8 +109,8 @@ On a seperate terminal start ArduCopter SITL
 Before launching the code you may want to edit a few parameters like start and goal location
 This can be done by editing the planner_params.yaml file inside config folder
 
-Finally, launch the planner code by executing this inside the build folder
+Finally, launch the planner code by executing this from the arduplanner folder
 
 ::
 
-	./main_node
+	./build/main_node

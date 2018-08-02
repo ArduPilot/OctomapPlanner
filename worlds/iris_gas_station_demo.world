@@ -1,0 +1,92 @@
+<?xml version="1.0" ?>
+
+<!--
+
+To run this demo, you must have following arducopter repo checked out:
+
+https://github.com/iche033/ardupilot/tree/gazebo_sitl_irlock
+
+Compile ArduCopter with SITL mode. Instructions are similar to:
+
+http://ardupilot.org/dev/docs/building-px4-for-linux-with-make.html
+
+but change the make target to sitl instead of px4-v2, i.e.
+
+$ cd ardupilot/ArduCopter && make sitl
+
+To start simulation, first run gazebo:
+
+gazebo worlds/iris_irlock_demo.world
+
+Gazebo starts up paused in a black screen. To run the simulation,
+setup ArduCopter and run the command below in a separate terminal:
+
+sim_vehicle.sh -j 4 -f Gazebo
+
+This will start mavproxy. Wait until you have a GPS lock.
+You can then do the usual mavprox commands with Gazebo, e.g.
+
+# arm the motors
+STABILIZE> arm throttle
+
+# switch to LOITER mode
+STABILIZE> mode LOITER
+
+# take off using rc command
+LOITER> rc 3 1700
+
+# wait until the irlock beacon is within the view then switch to land mode
+# to begin precision landing
+LOITER> mode LAND
+
+-->
+
+<sdf version="1.6">
+  <world name="default">
+    <physics type="ode">
+      <ode>
+        <solver>
+          <type>quick</type>
+          <iters>100</iters>
+          <sor>1.0</sor>
+        </solver>
+        <constraints>
+          <cfm>0.0</cfm>
+          <erp>0.9</erp>
+          <contact_max_correcting_vel>0.1</contact_max_correcting_vel>
+          <contact_surface_layer>0.0</contact_surface_layer>
+        </constraints>
+      </ode>
+      <real_time_update_rate>0</real_time_update_rate>
+      <max_step_size>0.0025</max_step_size>
+    </physics>
+    <scene>
+      <ambient>0.5 0.5 0.5 1</ambient>
+      <background>0.5 0.5 0.5 1</background>
+      <shadows>0</shadows>
+      <sky>
+      </sky>
+    </scene>
+
+    <include>
+      <uri>model://sun</uri>
+    </include>
+
+    <include>
+      <uri>model://grass_floor</uri>
+    </include>
+
+    <model name="iris">
+      <include>
+        <uri>model://iris_with_camera</uri>
+      </include>
+    </model>
+    <model name='Gas Station'>
+      <include>
+        <uri>model://gas_station</uri>
+      </include>
+      <pose frame=''>14 1.5 0 0 0 -1.57</pose>
+    </model>
+
+  </world>
+</sdf>
