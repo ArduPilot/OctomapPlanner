@@ -31,6 +31,15 @@ Users should first setup OSRF keys and install Gazebo 8 by executing
 	sudo apt update
 	sudo apt install libgazebo8-dev
 
+We will also use ros sources for installing other dependencies. To do that use the following commands
+
+::
+
+	sudo sh -c 'echo "deb http://packages.ros.org/ros/ubuntu $(lsb_release -sc) main" > /etc/apt/sources.list.d/ros-latest.list'
+	sudo apt-key adv --keyserver hkp://ha.pool.sks-keyservers.net:80 --recv-key 421C365BD9FF1F717815A3895523BAEEB01FA116
+	sudo apt update
+
+
 .. tip::
 
 ROS users can also install Gazebo 8 with ROS support after adding OSRF keys and using ros-kinetic-gazebo8-* packages
@@ -44,6 +53,12 @@ fcl
 
 ::
 
+	git clone https://github.com/danfis/libccd
+	cd libccd
+	mkdir build && cd build
+	cmake -G "Unix Makefiles" -DBUILD_SHARED_LIBS=ON ..
+	make && sudo make install
+	
 	git clone https://github.com/flexible-collision-library/fcl
 	cd fcl
 	mkdir build
@@ -62,21 +77,13 @@ mavlink
 
 ::
 
-	git clone https://github.com/mavlink/mavlink.git
-	cd mavlink
-	git submodule update --init --recursive
-	mkdir build
-	cd build
-	cmake ..
-	sudo make install
+	sudo apt install ros-kinetic-mavlink
 
 OMPL
 
 ::
 
-	wget http://ompl.kavrakilab.org/install-ompl-ubuntu.sh
-	chmod u+x install-ompl-ubuntu.sh
-	sh install-ompl-ubuntu.sh
+	sudo apt install ros-kinetic-ompl
 
 Finally, build ArduPlanner and copy the iris model for gazebo to find
 
