@@ -1,3 +1,24 @@
+/*
+*   OctomapPlanner
+*
+*   Copyright (C) 2018  ArduPilot
+*
+*   This program is free software: you can redistribute it and/or modify
+*   it under the terms of the GNU General Public License as published by
+*   the Free Software Foundation, either version 3 of the License, or
+*   (at your option) any later version.
+*
+*   This program is distributed in the hope that it will be useful,
+*   but WITHOUT ANY WARRANTY; without even the implied warranty of
+*   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+*   GNU General Public License for more details.
+*
+*   You should have received a copy of the GNU General Public License
+*   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*
+*   Author Ayush Gaud <ayush.gaud[at]gmail.com>
+*/
+
 #include <arduplanner.h>
 
 ArduPlanner::ArduPlanner(cv::Mat _start, cv::Mat _goal, double _velocity, bool _return_back, int _replan_interval, int _executor_interval, bool _visualize_octomap, double _min_range, double _max_range):
