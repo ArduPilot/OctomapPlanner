@@ -1,5 +1,5 @@
 /*
-*	OctomapPlanner
+*   OctomapPlanner
 *
 *   Copyright (C) 2018  ArduPilot
 *
