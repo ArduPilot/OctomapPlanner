@@ -49,24 +49,6 @@ Follow the steps here to install ardupilot_gazebo https://github.com/swiftgust/a
 Dependencies Installation
 =========================
 
-fcl
-
-::
-
-	git clone https://github.com/danfis/libccd
-	cd libccd
-	mkdir build && cd build
-	cmake -G "Unix Makefiles" -DBUILD_SHARED_LIBS=ON ..
-	make && sudo make install
-	
-	git clone https://github.com/flexible-collision-library/fcl
-	cd fcl
-	mkdir build
-	cd build
-	cmake ..
-	sudo make install
-
-
 octomap
 
 ::
@@ -85,7 +67,26 @@ OMPL
 
 	sudo apt install ros-kinetic-ompl
 
-Finally, build OctomapPlanner and copy the iris model for gazebo to find
+fcl
+
+::
+
+	git clone https://github.com/danfis/libccd
+	cd libccd
+	mkdir build && cd build
+	cmake -G "Unix Makefiles" -DBUILD_SHARED_LIBS=ON ..
+	make && sudo make install
+	
+	git clone https://github.com/flexible-collision-library/fcl
+	cd fcl
+	mkdir build
+	cd build
+	cmake ..
+	sudo make install
+
+
+
+Finally, build OctomapPlanner and copy the iris model and grass model for gazebo to find
 
 ::
 
@@ -95,7 +96,7 @@ Finally, build OctomapPlanner and copy the iris model for gazebo to find
 	cd build
 	cmake ..
 	make
-	cp -r ../models/iris_with_camera ~/.gazebo/models/
+	cp -r ../models/* ~/.gazebo/models/
 
 Running the code
 ================
