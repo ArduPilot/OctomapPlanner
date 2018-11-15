@@ -35,9 +35,9 @@ target_compile_options(MavlinkComm PRIVATE "-w")
 ##
 
 ## Planner Library
-find_package(OMPL REQUIRED)
+find_package(ompl REQUIRED)
 find_package(fcl REQUIRED)
-
+find_package(Eigen3 REQUIRED)
 add_library(Planner SHARED src/Planner.cpp)
 include_directories(${OMPL_INCLUDE_DIRS} ${fcl_INCLUDE_DIRS})
 message("Libs: ${OCTOMAP_LIBRARIES}")
