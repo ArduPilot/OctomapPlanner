@@ -6,6 +6,9 @@ OctomapPlanner
 
 This article explains how to set up and use ArduPlanner to work with Gazebo SITL
 
+.. image:: https://discuss.ardupilot.org/uploads/default/original/3X/f/1/f1618477d5558a5b77a186b81b52ae4e84345c09.jpg
+   :target: https://discuss.ardupilot.org/uploads/default/original/3X/f/1/f1618477d5558a5b77a186b81b52ae4e84345c09.jpg
+
 Overview
 ===============
 
@@ -120,6 +123,14 @@ This can be done by editing the planner_params.yaml file inside the config folde
 
 Finally, launch the planner code by executing this from the OctomapPlanner root folder
 
+
 ::
 
 	./build/main_node
+
+Related Blogs
+================
+
+`GSoC 2018: Realtime Mapping and Planning for Collision Avoidance <https://discuss.ardupilot.org/t/gsoc-2018-realtime-mapping-and-planning-for-collision-avoidance/29864>`_
+
+`GSoC 2018: Realtime Mapping and Planning for Collision Avoidance: Part 2 <https://discuss.ardupilot.org/t/gsoc-2018-realtime-mapping-and-planning-for-collision-avoidance-part-2/30750>`_
