@@ -119,6 +119,7 @@ On a seperate terminal start ArduCopter SITL
 Switch the copter to guided mode and takeoff using the following commands
 
 ::
+	
 	mode guided
 	arm throttle
 	takeoff 1 (or any other hight in metres)
