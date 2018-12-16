@@ -116,7 +116,12 @@ On a seperate terminal start ArduCopter SITL
 
 	sim_vehicle.py -v ArduCopter -f gazebo-iris
 
-Switch the copter to guided mode and takeoff
+Switch the copter to guided mode and takeoff using the following commands
+
+::
+	mode guided
+	arm throttle
+	takeoff 1 (or any other hight in metres)
 
 Before launching the code you may want to edit a few parameters like start and goal location
 This can be done by editing the planner_params.yaml file inside the config folder
