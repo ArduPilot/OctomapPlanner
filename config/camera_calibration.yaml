@@ -1,27 +1,40 @@
 %YAML:1.0
+# Camera Parameters for 3D Reconstruction
+# Makes 2D Image Plane to Match with the Physical World
+# Refer : https://docs.opencv.org/3.4.3/dc/dbb/tutorial_py_calibration.html
+
+# Camera Matrix of the Left Camera
 M1: !!opencv-matrix
    rows: 3
    cols: 3
    dt: d
-   data: [ 554.382712823, 0., 320, 0.,
-       415.787034617, 240, 0., 0., 1. ]
+   data: [ 554.382712823, 0., 320,
+          0., 415.787034617, 240,
+          0., 0., 1. ]
+# Distortion Coefficient of the Left Camera           
 D1: !!opencv-matrix
    rows: 1
    cols: 5
    dt: d
    data: [ 0., 0., 0., 0., 0. ]
+
+# Camera Matrix of the Right Camera
 M2: !!opencv-matrix
    rows: 3
    cols: 3
    dt: d
-   data: [ 554.382712823, 0., 320, 0.,
-       415.787034617, 240, 0., 0., 1. ]
+   data: [ 554.382712823, 0., 320,
+        0., 415.787034617, 240,
+        0., 0., 1. ]
+
+# Distortion Matrix of the Left Camera           
 D2: !!opencv-matrix
    rows: 1
    cols: 5
    dt: d
    data: [ 0., 0., 0., 0., 0. ]
 
+# Rotation Left Cam to Right Cam (Identity due to there is only translation between 2 cameras )
 R: !!opencv-matrix
   rows: 3
   cols: 3
@@ -29,12 +42,16 @@ R: !!opencv-matrix
   data: [ 1,0,0,
           0,1,0,
           0,0,1 ]
+
+# Translation Left Cam to Right Cam
 T: !!opencv-matrix
   rows: 3
   cols: 1
   dt: d
   data: [ -0.2, 0., 0. ]
 
+# Stereo SGBM(Semi-Global Block Matching) Parameter 
+# Please Refer : https://docs.opencv.org/3.4/d1/d9f/classcv_1_1stereo_1_1StereoBinarySGBM.html
 PreFilterCap: 63
 sgbmWinSize: 5
 MinDisparity: 0
